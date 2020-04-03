@@ -1,7 +1,7 @@
 """
 1、方式一
 从github上安装
-pip install https://github.com/shadowsocks/shadowsocks/archive/master.zip
+pip install https://github.com/wucng/torchTools/archive/master.zip
 
 2、方式二
 在setup.py目录下执行以下命令安装

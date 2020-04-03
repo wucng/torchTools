@@ -40,11 +40,16 @@ setup(
     # 依赖包
     install_requires=['torch', 'torchvision', 'numpy', 'pandas',  'matplotlib', 'pillow', 'tqdm', 'sklearn'],
     classifiers=[
-        "Development Status :: 4 - Beta",
-        "License :: OSI Approved :: MIT License",
-        "Natural Language :: English",
-        "Programming Language :: Python :: 3 :: Only",
-        "Topic :: Software Development :: Libraries :: Python Modules",
+        'Development Status :: 4 - Beta',
+        'Operating System :: Microsoft',  # 你的操作系统
+        'Operating System :: Linux',  # 你的操作系统
+        'Intended Audience :: Developers',
+        'License :: OSI Approved :: BSD License',  # BSD认证
+        'Programming Language :: Python :: 3',  # python版本 。。。
+        'Programming Language :: Python :: 3.4',
+        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
+        'Topic :: Software Development :: Libraries'
     ],
     zip_safe=True,
 )

@@ -43,7 +43,7 @@ def get_model(num_classes,droprate):
 
 
 
-class ClassifyModel(BaseParms):
+class ClassifyModel(nn.Module):
     def __init__(self,num_classes,epochs=10,droprate=0.5,lr=1e-3,
                  batch_size=32,test_batch_size=64,log_interval=30,
                  train_dataset=None,test_dataset=None,pred_dataset=None,

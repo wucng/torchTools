@@ -335,7 +335,7 @@ class LossFunc(object):
         # loss = -alpha*(1-torch.sum(target*input,-1))**gamma*torch.log(torch.sum(target*input,-1))
 
         # BCE_loss = -target*torch.log_softmax(input,-1)#-0.2*torch.softmax(input, -1)*torch.log_softmax(input,-1)
-        BCE_loss = F.cross_entropy(input, targets, reduction="sum")
+        BCE_loss = F.cross_entropy(input, target, reduction="sum")
         pt = torch.exp(-BCE_loss)
         loss = alpha * (1 - pt) ** gamma * BCE_loss
 

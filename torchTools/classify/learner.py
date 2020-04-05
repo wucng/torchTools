@@ -58,9 +58,8 @@ class ClassifyModel(nn.Module):
             state_dict = torch.load(self.save_model)
             self.network.load_state_dict({k: v for k, v in state_dict.items() if k in self.network.state_dict()})
 
-
+        self.useTensorboard = useTensorboard
         if useTensorboard:
-            self.useTensorboard = useTensorboard
             self.writer = SummaryWriter(os.path.join(base_path,'runs/experiment'))
 
     # Train the network for one or more epochs, validating after each epoch.

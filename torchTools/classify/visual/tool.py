@@ -11,6 +11,7 @@ from sklearn.decomposition import PCA
 from sklearn import manifold
 import math
 import numpy as np
+import PIL.Image
 
 class History():
     epoch = []
@@ -122,8 +123,20 @@ def static_data(dataPaths=[],classnames=None):
     plt.show()
 
 
+def get_img_label(dataPaths=[],classnames=[],counts=25):
+    np.random.shuffle(dataPaths)
+    labels = []
+    images = []
+    for i,path in enumerate(dataPaths):
+        if i >= counts:break
+        labels.append(classnames.index(os.path.basename(os.path.dirname(path))))
+        images.append(np.asarray(PIL.Image.open(path).convert("RGB"),np.uint8))
+
+    return images,labels
+
+
 # 可视化每个类别的图片
-def show_images(images,labels,rows=2,cols=5):
+def show_images(images,labels,rows=5,cols=5):
     # f, axes=plt.subplots(rows,cols,figsize=(12,8))
     f, axes=plt.subplots(rows,cols)
     f.subplots_adjust(0, 0, 3, 3)

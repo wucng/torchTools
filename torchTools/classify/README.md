@@ -81,6 +81,8 @@ cls = ClassifyModel(num_classes,epochs=2,
 
 cls.fit()
 
+tool.show_final_history(cls.history)
+
 # 混淆矩阵
 y_true, y_pred,features = cls.getTrueAndPred(wantFeature=True)
 tool.show_confusion_matrix2(y_true, y_pred,classnames)

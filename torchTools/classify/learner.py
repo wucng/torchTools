@@ -62,6 +62,7 @@ class ClassifyModel(nn.Module):
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
         torch.manual_seed(seed)
         kwargs = {'num_workers': 5, 'pin_memory': True} if self.use_cuda else {}
+        self.base_path = base_path
 
         if train_dataset is not None:
             self.train_loader = DataLoader(train_dataset,batch_size=self.batch_size,shuffle=True,**kwargs)
@@ -199,9 +200,9 @@ class ClassifyModel(nn.Module):
             self.history.history["val_acc"].append(test_acc)
 
         # 保存json文件
-        json.dump(self.history.history, open(os.path.join(base_path,"result.json"), "w"))
+        json.dump(self.history.history, open(os.path.join(self.base_path,"result.json"), "w"))
         # 显示训练记录的结果
-        self.history.show_final_history(self.history)
+        # self.history.show_final_history(self.history)
 
     def predict(self):
         self.network.eval()

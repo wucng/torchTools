@@ -61,7 +61,7 @@ class GlobalAvgPool2d(nn.Module):
 
 
 class Darknet19(BaseModel):
-    def __init__(self, pretrained=True):
+    def __init__(self,num_classes,droprate, pretrained=True):
         super(Darknet19, self).__init__()
 
         self.features = nn.Sequential(OrderedDict([
@@ -139,7 +139,8 @@ class Darknet19(BaseModel):
         ]))
 
         self.classifier = nn.Sequential(OrderedDict([
-        ('conv7_1', nn.Conv2d(1024, 1000, kernel_size=(1, 1), stride=(1, 1))),
+        ('drop',nn.Dropout(p=droprate)),
+        ('conv7_1', nn.Conv2d(1024, num_classes, kernel_size=(1, 1), stride=(1, 1))),
         ('globalavgpool', GlobalAvgPool2d()),
         ('softmax', nn.Softmax(dim=1))
         ]))

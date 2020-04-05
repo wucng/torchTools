@@ -30,7 +30,7 @@ class DarkResidualBlock(nn.Module):
 
 
 class Darknet53(nn.Module):
-    def __init__(self, block, num_classes):
+    def __init__(self, block, num_classes,droprate=0.5):
         super(Darknet53, self).__init__()
 
         self.num_classes = num_classes
@@ -46,6 +46,7 @@ class Darknet53(nn.Module):
         self.residual_block4 = self.make_layer(block, in_channels=512, num_blocks=8)
         self.conv6 = conv_batch(512, 1024, stride=2)
         self.residual_block5 = self.make_layer(block, in_channels=1024, num_blocks=4)
+        self.drop = nn.Dropout(p=droprate)
         self.global_avg_pool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(1024, self.num_classes)
 
@@ -61,6 +62,7 @@ class Darknet53(nn.Module):
         out = self.residual_block4(out)
         out = self.conv6(out)
         out = self.residual_block5(out)
+        out = self.drop(out)
         out = self.global_avg_pool(out)
         out = out.view(-1, 1024)
         out = self.fc(out)
@@ -74,5 +76,5 @@ class Darknet53(nn.Module):
         return nn.Sequential(*layers)
 
 
-def darknet53(num_classes):
-    return Darknet53(DarkResidualBlock, num_classes)
+def darknet53(num_classes,droprate=0.5):
+    return Darknet53(DarkResidualBlock, num_classes,droprate=droprate)

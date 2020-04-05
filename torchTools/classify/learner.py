@@ -22,7 +22,28 @@ class Flatten(nn.Module):
     def forward(self, x):
         return torch.flatten(x,1)
 
-class ClassifyModel(nn.Module):
+def get_model(num_classes,droprate):
+    _model = torchvision.models.resnet50(True)
+    network = nn.Sequential(
+        _model.conv1,
+        _model.bn1,
+        _model.relu,
+        _model.maxpool,
+        _model.layer1,
+        _model.layer2,
+        _model.layer3,
+        _model.layer4,
+
+        nn.Dropout(droprate),
+        nn.AdaptiveAvgPool2d((1, 1)),
+        Flatten(),
+        nn.Linear(512, num_classes)
+    )
+    return network
+
+
+
+class ClassifyModel(BaseParms):
     def __init__(self,num_classes,epochs=10,droprate=0.5,lr=1e-3,
                  batch_size=32,test_batch_size=64,log_interval=30,
                  train_dataset=None,test_dataset=None,pred_dataset=None,
@@ -48,35 +69,27 @@ class ClassifyModel(nn.Module):
             self.test_loader = DataLoader(test_dataset,batch_size=self.test_batch_size,shuffle=False,**kwargs)
         if pred_dataset is not None:
             self.test_loader = DataLoader(pred_dataset,batch_size=self.test_batch_size,shuffle=False,**kwargs)
-        # self.network = network
 
-        _model = torchvision.models.resnet18(True)
-        self.network = nn.Sequential(
-            _model.conv1,
-            _model.bn1,
-            _model.relu,
-            _model.maxpool,
-            _model.layer1,
-            _model.layer2,
-            _model.layer3,
-            _model.layer4,
-            nn.Dropout(droprate, inplace=True),
-            nn.AdaptiveAvgPool2d((1, 1)),
-            Flatten(),
-            nn.Linear(512, num_classes)
-        )
+        if network is None:
+            self.network = get_model(num_classes,droprate)
+        else:
+            self.network = network
 
         if self.use_cuda:
             self.network.to(self.device)
 
-        self.lossFunc = lossFunc
-        # if hasattr(self.network, 'parmas'):
-        #     # self.optimizer = optimizer(self.network.parmas(lr), lr=lr, weight_decay=4e-5)
-        #     self.optimizer = torch.optim.Adam(self.network.parmas(lr), weight_decay=4e-05)
-        # else:
-            # self.optimizer = optimizer(self.network.parameters(),lr=lr,weight_decay=4e-5)
-        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr,weight_decay=4e-05)
+        if lossFunc is None:
+            self.lossFunc = nn.CrossEntropyLoss(reduction='sum')
+        else:
+            self.lossFunc = lossFunc
 
+        if optimizer is None:
+            self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr, weight_decay=4e-05)
+        else:
+            if hasattr(self.network, 'parmas'):
+                self.optimizer = optimizer(self.network.parmas(lr), lr=lr, weight_decay=4e-5)
+            else:
+                self.optimizer = optimizer(self.network.parameters(),lr=lr,weight_decay=4e-5)
 
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1)
 
@@ -111,8 +124,7 @@ class ClassifyModel(nn.Module):
 
             self.optimizer.zero_grad()
             output = self.network(data)
-            # loss = self.lossFunc(output, target)
-            loss = F.cross_entropy(output, target, reduction="sum")
+            loss = self.lossFunc(output, target)
             train_loss += loss.item()
             loss /= len(data)
             loss.backward()
@@ -155,8 +167,7 @@ class ClassifyModel(nn.Module):
                     data, target = data.to(self.device), target.to(self.device)
 
             output = self.network(data)
-            # test_loss += self.lossFunc(output, target).data.item()
-            test_loss += F.cross_entropy(output, target, reduction="sum").data.item()
+            test_loss += self.lossFunc(output, target).data.item()
             pred = output.data.max(1)[1]
             correct += pred.eq(target.data).cpu().sum()
         test_loss /= num_tests

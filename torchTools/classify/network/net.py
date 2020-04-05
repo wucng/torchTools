@@ -83,7 +83,7 @@ class Resnet(BaseNet):
         ]))
 
         self._conv1 = nn.Sequential(
-            nn.Dropout(droprate, inplace=True),
+            nn.Dropout(droprate),
             # nn.Conv2d(backbone_size, backbone_size, 3, 1,padding=1),
             # nn.BatchNorm2d(backbone_size),
             # nn.ReLU(),
@@ -120,7 +120,7 @@ class Mnasnet(BaseNet):
         ]))
 
         self.classifier = nn.Sequential(
-            nn.Dropout(p=dropout, inplace=True),
+            nn.Dropout(p=dropout),
             nn.AdaptiveAvgPool2d((1, 1)),
             Flatten(),
             # nn.Conv2d(backbone_size, backbone_size, 3, 1,padding=1),
@@ -156,7 +156,7 @@ class Densenet(BaseNet):
 
         # Linear layer
         self.classifier = nn.Sequential(
-            nn.Dropout(p=droprate, inplace=True),
+            nn.Dropout(p=droprate),
             nn.Linear(backbone_size, num_classes))
 
     def forward(self, x):
@@ -182,10 +182,10 @@ class Alexnet(BaseNet):
         self._conv1 = nn.Sequential(
             nn.AdaptiveAvgPool2d((6, 6)),
             Flatten(),
-            nn.Dropout(droprate, inplace=True),
+            nn.Dropout(droprate),
             nn.Linear(256 * 6 * 6, 4096),
             nn.ReLU(inplace=True),
-            nn.Dropout(droprate, inplace=True),
+            nn.Dropout(droprate),
             nn.Linear(4096, 4096),
             nn.ReLU(inplace=True),
             nn.Linear(4096, num_classes),
@@ -227,10 +227,10 @@ class VGGnet(BaseNet):
             Flatten(),
             nn.Linear(512 * 7 * 7, 4096),
             nn.ReLU(True),
-            nn.Dropout(p=droprate, inplace=True),
+            nn.Dropout(p=droprate),
             nn.Linear(4096, 4096),
             nn.ReLU(True),
-            nn.Dropout(p=droprate, inplace=True),
+            nn.Dropout(p=droprate),
             nn.Linear(4096, num_classes),
         )
 
@@ -260,7 +260,7 @@ class Squeezenet(BaseNet):
         ]))
 
         self._conv1 = nn.Sequential(
-            nn.Dropout(p=droprate, inplace=True),
+            nn.Dropout(p=droprate),
             nn.Conv2d(512, num_classes, kernel_size=1),
             nn.ReLU(inplace=True),
             nn.AdaptiveAvgPool2d((1, 1)),
@@ -292,7 +292,7 @@ class Mobilenet(BaseNet):
         ]))
 
         self._conv1 = nn.Sequential(
-            nn.Dropout(p=droprate, inplace=True),
+            nn.Dropout(p=droprate),
             nn.AdaptiveAvgPool2d((1,1)),
             Flatten(),
             nn.Linear(backbone_size, num_classes)
@@ -340,7 +340,7 @@ class ShuffleNetV2(BaseNet):
         ]))
 
         self._conv1 = nn.Sequential(
-            nn.Dropout(p=droprate, inplace=True),
+            nn.Dropout(p=droprate),
             nn.AdaptiveAvgPool2d((1,1)),
             Flatten(),
             nn.Linear(backbone_size, num_classes)

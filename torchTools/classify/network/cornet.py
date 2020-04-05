@@ -90,7 +90,7 @@ class CORnet_R(nn.Module):
         self.IT = CORblock_R(256, 512, stride=2, out_shape=7)
 
         self.decoder = nn.Sequential(OrderedDict([
-            ("drop",nn.Dropout(p=droprate,inplace=True)),
+            ("drop",nn.Dropout(p=droprate)),
             ('avgpool', nn.AdaptiveAvgPool2d((1,1))),
             ('flatten', Flatten()),
             ('linear', nn.Linear(512, num_classes))
@@ -179,7 +179,7 @@ class CORnet_RT(nn.Module):
         self.IT = CORblock_RT(256, 512, stride=2, out_shape=7)
 
         self.decoder = nn.Sequential(OrderedDict([
-            ("drop", nn.Dropout(p=droprate, inplace=True)),
+            ("drop", nn.Dropout(p=droprate)),
             ('avgpool', nn.AdaptiveAvgPool2d(1)),
             ('flatten', Flatten()),
             ('linear', nn.Linear(512, num_classes))
@@ -301,7 +301,7 @@ class CORnet_S(nn.Module):
 
         self.decoder = nn.Sequential(
             OrderedDict([
-                ("drop", nn.Dropout(p=droprate, inplace=True)),
+                ("drop", nn.Dropout(p=droprate)),
                 ('avgpool', nn.AdaptiveAvgPool2d(1)),
                 ('flatten', Flatten()),
                 ('linear', nn.Linear(512, num_classes)),
@@ -355,7 +355,7 @@ class CORnet_Z(nn.Module):
             ('IT', CORblock_Z(256, 512)),
         ]))
         self.decoder = nn.Sequential(OrderedDict([
-                ("drop", nn.Dropout(p=droprate, inplace=True)),
+                ("drop", nn.Dropout(p=droprate)),
                 ('avgpool', nn.AdaptiveAvgPool2d(1)),
                 ('flatten', Flatten()),
                 ('linear', nn.Linear(512, num_classes)),

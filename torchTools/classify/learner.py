@@ -60,6 +60,7 @@ class ClassifyModel(nn.Module):
             _model.layer2,
             _model.layer3,
             _model.layer4,
+            nn.Dropout(droprate, inplace=True),
             nn.AdaptiveAvgPool2d((1, 1)),
             Flatten(),
             nn.Linear(512, num_classes)

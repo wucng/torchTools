@@ -1,12 +1,50 @@
+# https://github.com/visionNoob/pytorch-darknet19
 from collections import OrderedDict
 from torch import nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
-from base import BaseModel
+import logging
+import numpy as np
+
 
 model_paths = {
     'darknet19': 'https://s3.ap-northeast-2.amazonaws.com/deepbaksuvision/darknet19-deepBakSu-e1b3ec1e.pth'
 }
+
+
+
+class BaseModel(nn.Module):
+    """
+    Base class for all models
+    """
+    def __init__(self):
+        super(BaseModel, self).__init__()
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    def forward(self, *input):
+        """
+        Forward pass logic
+        :return: Model output
+        """
+        raise NotImplementedError
+
+    def summary(self):
+        """
+        Model summary
+        """
+
+        model_parameters = filter(lambda p: p.requires_grad, self.parameters())
+        params = sum([np.prod(p.size()) for p in model_parameters])
+        self.logger.info('Trainable parameters: {}'.format(params))
+        self.logger.info(self)
+
+    def __str__(self):
+        """
+        Model prints with number of trainable parameters
+        """
+        model_parameters = filter(lambda p: p.requires_grad, self.parameters())
+        params = sum([np.prod(p.size()) for p in model_parameters])
+        return super(BaseModel, self).__str__() + '\nTrainable parameters: {}'.format(params)
 
 class GlobalAvgPool2d(nn.Module):
     def __init__(self):

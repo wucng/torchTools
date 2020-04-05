@@ -68,7 +68,7 @@ class ClassifyModel(nn.Module):
         if test_dataset is not None:
             self.test_loader = DataLoader(test_dataset,batch_size=self.test_batch_size,shuffle=False,**kwargs)
         if pred_dataset is not None:
-            self.test_loader = DataLoader(pred_dataset,batch_size=self.test_batch_size,shuffle=False,**kwargs)
+            self.pred_loader = DataLoader(pred_dataset,batch_size=self.test_batch_size,shuffle=False,**kwargs)
 
         if network is None:
             self.network = get_model(num_classes,droprate)

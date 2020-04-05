@@ -8,6 +8,7 @@ from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset
 from imgaug import augmenters as iaa
 import imgaug as ia
+import numpy as np
 import PIL.Image
 
 def get_transforms(baseSize=(256, 256),targetSize = (224, 224)):

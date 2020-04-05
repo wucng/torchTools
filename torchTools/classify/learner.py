@@ -198,6 +198,8 @@ class ClassifyModel(nn.Module):
             self.history.history["val_loss"].append(test_loss)
             self.history.history["val_acc"].append(test_acc)
 
+        # 保存json文件
+        json.dump(self.history.history, open(os.path.join(base_path,"result.json"), "w"))
         # 显示训练记录的结果
         self.history.show_final_history(self.history)
 

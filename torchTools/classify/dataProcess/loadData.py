@@ -125,7 +125,8 @@ def splitData(root,valid_rote = 0.3):
     for name in classnames:
         path = os.path.join(root,name)
         # for img in os.listdir(path):
-        imgs = glob(os.path.join(path,"*"))
+        # imgs = glob(os.path.join(path,"*"))
+        imgs = glob_format(path)
         # shuffle
         np.random.shuffle(imgs)
         len_tdatas = int(len(imgs)*valid_rote)

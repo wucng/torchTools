@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from attention_augmented_conv import AugmentedConv
+from .attention_augmented_conv import AugmentedConv
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 

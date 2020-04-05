@@ -97,7 +97,7 @@ class Data_train_valid(Dataset):
 
     def _shuttle(self):
         # np.random.shuffle(self.paths)
-        self.paths = random.shuffle(self.paths)
+        random.shuffle(self.paths)
 
     def __len__(self):
         return len(self.paths)
@@ -131,7 +131,7 @@ def splitData(root,valid_rote = 0.3):
         imgs = glob_format(path)
         # shuffle
         # np.random.shuffle(imgs)
-        imgs = random.shuffle(imgs)
+        random.shuffle(imgs)
         len_tdatas = int(len(imgs)*valid_rote)
         valid_datas.extend(imgs[:len_tdatas])
         train_datas.extend(imgs[len_tdatas:])

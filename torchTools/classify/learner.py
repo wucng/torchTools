@@ -42,12 +42,31 @@ def get_model(num_classes,droprate):
     return network
 
 
+class History():
+    epoch = []
+    history = {"loss": [], "acc": [], "val_loss": [], "val_acc": []}
+
+    # 打印训练结果信息
+    def show_final_history(self,history):
+        fig, ax = plt.subplots(1, 2, figsize=(15, 5))
+        ax[0].set_title('loss')
+        ax[0].plot(history.epoch, history.history["loss"], label="Train loss")
+        ax[0].plot(history.epoch, history.history["val_loss"], label="Validation loss")
+        ax[1].set_title('acc')
+        ax[1].plot(history.epoch, history.history["acc"], label="Train acc")
+        ax[1].plot(history.epoch, history.history["val_acc"], label="Validation acc")
+        ax[0].legend()
+        ax[1].legend()
+
+        plt.show()
+
+
 
 class ClassifyModel(nn.Module):
     def __init__(self,num_classes,epochs=10,droprate=0.5,lr=1e-3,
                  batch_size=32,test_batch_size=64,log_interval=30,
                  train_dataset=None,test_dataset=None,pred_dataset=None,
-                 network=None, optimizer=None,lossFunc=None,history=None,
+                 network=None, optimizer=None,lossFunc=None,
                  base_path="./",save_model="model.pt",
                  useTensorboard=False):
         super(ClassifyModel,self).__init__()
@@ -96,7 +115,8 @@ class ClassifyModel(nn.Module):
 
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1)
 
-        self.history = history
+        self.history = History()
+
         # self.save_model = os.path.join(os.getcwd(),save_model)
         self.save_model = os.path.join(base_path,save_model)
         if os.path.exists(self.save_model):
@@ -202,7 +222,7 @@ class ClassifyModel(nn.Module):
         # 保存json文件
         json.dump(self.history.history, open(os.path.join(self.base_path,"result.json"), "w"))
         # 显示训练记录的结果
-        # self.history.show_final_history(self.history)
+        self.history.show_final_history(self.history)
 
     def predict(self):
         self.network.eval()

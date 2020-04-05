@@ -62,7 +62,6 @@ network = net.Resnet(num_classes,'resnet50',True,0.5)
 optimizer = optimizer.RAdam
 
 lossFunc = loss.LossFunc(num_classes,reduction="sum").focal_cross_entropy
-history = tool.History()
 
 
 # cls = ClassifyModel(num_classes,train_dataset=train_dataset,test_dataset=test_dataset
@@ -80,8 +79,6 @@ cls = ClassifyModel(num_classes,epochs=2,
                     useTensorboard=True)
 
 cls.fit()
-
-tool.show_final_history(cls.history)
 
 # 混淆矩阵
 y_true, y_pred,features = cls.getTrueAndPred(wantFeature=True)

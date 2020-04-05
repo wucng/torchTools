@@ -88,7 +88,8 @@ class ClassifyModel(nn.Module):
 
             self.optimizer.zero_grad()
             output = self.network(data)
-            loss = self.lossFunc(output, target)
+            # loss = self.lossFunc(output, target)
+            loss = F.cross_entropy(output, target, reduction="sum")
             train_loss += loss.item()
             loss /= len(data)
             loss.backward()
@@ -131,7 +132,8 @@ class ClassifyModel(nn.Module):
                     data, target = data.to(self.device), target.to(self.device)
 
             output = self.network(data)
-            test_loss += self.lossFunc(output, target).data.item()
+            # test_loss += self.lossFunc(output, target).data.item()
+            test_loss += F.cross_entropy(output, target, reduction="sum").data.item()
             pred = output.data.max(1)[1]
             correct += pred.eq(target.data).cpu().sum()
         test_loss /= num_tests

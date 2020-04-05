@@ -1,12 +1,13 @@
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset
+import numpy as np
 from glob import glob
 import PIL.Image
 import os
 
 # load data
 def glob_format(path, base_name=False):
-    print('--------pid:%d start--------------' % (os.getpid()))
+    # print('--------pid:%d start--------------' % (os.getpid()))
     fmt_list = ('.jpg', '.jpeg', '.png')
     fs = []
     if not os.path.exists(path): return fs
@@ -22,13 +23,13 @@ def glob_format(path, base_name=False):
                 fs.append(file)  # fs.append(os.path.splitext(file)[0])
             else:
                 fs.append(item)
-    print('--------pid:%d end--------------' % (os.getpid()))
+    # print('--------pid:%d end--------------' % (os.getpid()))
     return fs
 
 
 # read .txt 结合命令: tree -i -f `pwd`/20181022/json_data/|grep .jpg >data.txt
 def read_txt(path):#, batch_frame_queue, batch_size):
-    print('--------pid:%d start--------------' % (os.getpid()))
+    # print('--------pid:%d start--------------' % (os.getpid()))
     batch_frames_info = []
     fp = open(path)
     try:
@@ -46,7 +47,7 @@ def read_txt(path):#, batch_frame_queue, batch_size):
 
     # if len(batch_frames_info) > 0:
     #     batch_frame_queue.put(batch_frames_info)
-    print('--------pid:%d end--------------' % (os.getpid()))
+    # print('--------pid:%d end--------------' % (os.getpid()))
     return batch_frames_info
 
 
@@ -54,7 +55,8 @@ def read_txt(path):#, batch_frame_queue, batch_size):
 class Data_pred(Dataset):
     def __init__(self,root,transform=None):
         super(Data_pred, self).__init__()
-        self.datas = glob(os.path.join(root,"*.jpg"))
+        # self.datas = glob(os.path.join(root,"*.jpg"))
+        self.datas = glob_format(root)
         self.transform = transform
 
     def __len__(self):

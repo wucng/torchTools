@@ -192,7 +192,7 @@ class ClassifyModel(nn.Module):
             output = self.network(data)
             test_loss += self.lossFunc(output, target).data.item()
             pred = output.data.max(1)[1]
-            correct += pred.eq(target.data).cpu().sum()
+            correct += pred.eq(target.data).cpu().sum().item()
         test_loss /= num_tests
         test_acc = correct / num_tests
         print(

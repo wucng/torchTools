@@ -6,6 +6,7 @@ New for ResNeXt:
 
 import torch.nn as nn
 import math
+import numpy as np
 
 __all__ = ['SE_ResNeXt', 'se_resnext_50', 'se_resnext_101', 'se_resnext_152']
 

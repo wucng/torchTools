@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import torch.nn as nn
 import torchvision
 from collections import OrderedDict
+import numpy as np
 
 __all__ = ['Resnet', 'Mnasnet', 'Densenet',
            'Alexnet','VGGnet','Squeezenet',

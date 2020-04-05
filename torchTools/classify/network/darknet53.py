@@ -1,6 +1,7 @@
 # https://github.com/developer0hye/PyTorch-Darknet53
 import torch
 from torch import nn
+import numpy as np
 
 def conv_batch(in_num, out_num, kernel_size=3, padding=1, stride=1):
     return nn.Sequential(

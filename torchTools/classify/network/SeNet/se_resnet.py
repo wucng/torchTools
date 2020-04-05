@@ -1,6 +1,7 @@
 import torch.nn as nn
 import math
 import torch.utils.model_zoo as model_zoo
+import numpy as np
 
 
 __all__ = ['SENet', 'se_resnet_18', 'se_resnet_34', 'se_resnet_50', 'se_resnet_101',

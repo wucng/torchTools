@@ -5,6 +5,7 @@ from collections import OrderedDict
 import torch
 from torch import nn
 import math
+import numpy as np
 
 
 __all__ = ['CORnet_R',

@@ -322,8 +322,8 @@ class LossFunc(object):
 
         """
         # 转one-hot
-        if target.ndim==1:
-            target = torch.eye(self.num_classes, self.num_classes,device=target.device)[target]
+        # if target.ndim==1:
+        #     target = torch.eye(self.num_classes, self.num_classes,device=target.device)[target]
 
         # loss = -target*torch.log_softmax(input,-1)
         if alpha is None:

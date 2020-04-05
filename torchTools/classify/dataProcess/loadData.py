@@ -6,6 +6,11 @@ from glob import glob
 import PIL.Image
 import os
 
+
+def get_classnames(base_dir):
+    classnames = sorted(os.listdir(os.path.join(base_dir)))
+    return classnames
+
 # load data
 def glob_format(path, base_name=False):
     # print('--------pid:%d start--------------' % (os.getpid()))

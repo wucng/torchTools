@@ -105,47 +105,14 @@ def show_confusion_matrix2(y_true, y_pred,classes=None,title='Confusion Matrix',
     plt.xlabel('Predicted label\naccuracy={:0.4f}; misclass={:0.4f}'.format(accuracy, misclass))
     plt.show()
 
-
-
-# 获取每个类别的种类
-def get_data(data_path,mode="train"):
-    # paths=glob(os.path.join(data_path,mode,"*","*.jpg"))+\
-    #       glob(os.path.join(data_path,mode,"*","*.JPG"))
-    paths=glob(os.path.join(data_path, mode, "*", "*"))
-    datas_dict={}
-    for path in tqdm(paths):
-        class_name=os.path.basename(os.path.dirname(path))
-        if class_name not in datas_dict:
-            datas_dict[class_name]=[]
-        datas_dict[class_name].append(path)
-
-    return datas_dict
-
-# 统计数据的数量
-def static_data(base_path,mode="val"):
-    datas_dict=get_data(base_path,mode)
-    labels=list(datas_dict.keys())
-    datas=[len(datas_dict[k]) for k in labels]
-    f, ax = plt.subplots(1, 1, figsize=(8, 6))
-    ax.pie(datas, labels=labels, autopct='%1.2f%%')
-    ax.set_title(mode)
-    plt.show()
-
-# static_data(base_path,"train")
-# static_data(base_path,"valid")
-
-
-def get_data2(data_path,mode="train"):
-    image_paths=[]
+def static_data(dataPaths=[],classnames=None):
     label_names=[]
-    paths = glob(os.path.join(data_path, mode, "*", "*"))
-    for path in tqdm(paths):
-        class_name = os.path.basename(os.path.dirname(path))
-        label_names.append(class_name)
-        image_paths.append(path)
-    return image_paths,label_names
+    for path in dataPaths:
+        if classnames is not None:
+            label_names.append(classnames.index(os.path.basename(os.path.dirname(path))))
+        else:
+            label_names.append(os.path.basename(os.path.dirname(path)))
 
-def static_data2(label_names):
     # 先调一下背景和载入一下数据
     sns.set(style="darkgrid")
     f, ax = plt.subplots(1, 2, figsize=(12, 8))
@@ -153,9 +120,6 @@ def static_data2(label_names):
     data = dict(Counter(label_names))
     ax[1].pie(list(data.values()), labels=list(data.keys()), autopct='%1.2f%%')
     plt.show()
-
-# image_paths,label_names=get_data2(base_path,"train")
-# static_data2(label_names)
 
 
 # 可视化每个类别的图片

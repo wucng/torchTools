@@ -7,6 +7,7 @@ import torchvision
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets, transforms
+import torchvision
 # from tensorboardX import SummaryWriter
 from torch.utils.tensorboard import SummaryWriter
 import PIL.Image
@@ -14,6 +15,12 @@ from collections import OrderedDict
 import math
 import matplotlib.pyplot as plt
 import json
+
+class Flatten(nn.Module):
+    def __init__(self):
+        super(Flatten, self).__init__()
+    def forward(self, x):
+        return torch.flatten(x,1)
 
 class ClassifyModel(nn.Module):
     def __init__(self,num_classes,epochs=10,droprate=0.5,lr=1e-3,
@@ -41,7 +48,22 @@ class ClassifyModel(nn.Module):
             self.test_loader = DataLoader(test_dataset,batch_size=self.test_batch_size,shuffle=False,**kwargs)
         if pred_dataset is not None:
             self.test_loader = DataLoader(pred_dataset,batch_size=self.test_batch_size,shuffle=False,**kwargs)
-        self.network = network
+        # self.network = network
+
+        _model = torchvision.models.resnet18(True)
+        self.network = nn.Sequential(
+            _model.conv1,
+            _model.bn1,
+            _model.relu,
+            _model.maxpool,
+            _model.layer1,
+            _model.layer2,
+            _model.layer3,
+            _model.layer4,
+            nn.AdaptiveAvgPool2d((1, 1)),
+            Flatten(),
+            nn.Linear(512, num_classes)
+        )
 
         if self.use_cuda:
             self.network.to(self.device)

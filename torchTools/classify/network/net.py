@@ -354,8 +354,11 @@ class ShuffleNetV2(BaseNet):
 
 if __name__=="__main__":
     model = Resnet(10,'resnet18')
-    if hasattr(model,'parmas'):
-        print(1)
+    # if hasattr(model,'parmas'):
+    if callable(model.params):
+       parmas = model.parmas()
+    else:
+        parmas = model.parameters()
 
 
     # print(model(x).shape)

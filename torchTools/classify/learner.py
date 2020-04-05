@@ -197,7 +197,7 @@ class ClassifyModel(nn.Module):
             self.history.history["val_acc"].append(test_acc)
 
         # 显示训练记录的结果
-        show_final_history(self.history)
+        self.history.show_final_history(self.history)
 
     def predict(self):
         self.network.eval()

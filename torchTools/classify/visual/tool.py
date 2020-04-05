@@ -12,6 +12,7 @@ from sklearn import manifold
 import math
 import numpy as np
 import PIL.Image
+import itertools
 
 class History():
     epoch = []
@@ -56,7 +57,7 @@ def confusion_matrix(y_true,y_pred,cate_list=[],save_path=None): # "./test.csv"
 
 # 打印混淆矩阵
 def show_confusion_matrix(y_true, y_pred,classes=[]):
-    mat=confusion_matrix(y_true, y_pred)
+    mat=metrics.confusion_matrix(y_true,y_pred)
     colormap = plt.cm.viridis
     plt.figure(figsize=(12,12)) # 根据需要自行设置大小（也可省略）
     plt.title('confusion matrix', y=1.05, size=15) #加标题

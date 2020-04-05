@@ -35,15 +35,15 @@ class BaseNet(nn.Module):
     def __init__(self):
         super(BaseNet,self).__init__()
 
-    def params(self):
+    def params(self,lr=1e-3):
         base_params = list(
             map(id, self.backbone.parameters())
         )
         logits_params = filter(lambda p: id(p) not in base_params, self.parameters())
 
         params = [
-            {"params": logits_params, "lr": 1e-3},
-            {"params": self.backbone.parameters(), "lr": 2e-4},
+            {"params": logits_params, "lr": lr},
+            {"params": self.backbone.parameters(), "lr": lr/5},
         ]
 
         return params
@@ -354,6 +354,8 @@ class ShuffleNetV2(BaseNet):
 
 if __name__=="__main__":
     model = Resnet(10,'resnet18')
-    x = torch.rand([1,3,224,224])
+    if hasattr(model,'parmas'):
+        print(1)
 
-    print(model(x).shape)
+
+    # print(model(x).shape)

@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 import json
 
 class ClassifyModel(nn.Module):
-    def __init__(self,num_classes,epochs=10,droprate=0.5,
+    def __init__(self,num_classes,epochs=10,droprate=0.5,lr=1e-3,
                  batch_size=32,test_batch_size=64,log_interval=30,
                  train_dataset=None,test_dataset=None,pred_dataset=None,
                  network=None, optimizer=None,lossFunc=None,history=None,
@@ -47,7 +47,10 @@ class ClassifyModel(nn.Module):
             self.network.to(self.device)
 
         self.lossFunc = lossFunc
-        self.optimizer = optimizer
+        if hasattr(self.network, 'parmas'):
+            self.optimizer = optimizer(self.network.parmas(lr), lr=lr, weight_decay=4e-5)
+        else:
+            self.optimizer = optimizer(self.network.parameters(),lr=lr,weight_decay=4e-5)
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1)
 
         self.history = history

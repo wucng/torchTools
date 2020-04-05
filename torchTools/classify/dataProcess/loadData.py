@@ -1,6 +1,7 @@
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, Dataset
-import numpy as np
+# import numpy as np
+import random
 from glob import glob
 import PIL.Image
 import os
@@ -95,7 +96,8 @@ class Data_train_valid(Dataset):
         self.target_transform = target_transform
 
     def _shuttle(self):
-        np.random.shuffle(self.paths)
+        # np.random.shuffle(self.paths)
+        self.paths = random.shuffle(self.paths)
 
     def __len__(self):
         return len(self.paths)
@@ -128,7 +130,8 @@ def splitData(root,valid_rote = 0.3):
         # imgs = glob(os.path.join(path,"*"))
         imgs = glob_format(path)
         # shuffle
-        np.random.shuffle(imgs)
+        # np.random.shuffle(imgs)
+        imgs = random.shuffle(imgs)
         len_tdatas = int(len(imgs)*valid_rote)
         valid_datas.extend(imgs[:len_tdatas])
         train_datas.extend(imgs[len_tdatas:])

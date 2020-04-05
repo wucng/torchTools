@@ -47,10 +47,14 @@ class ClassifyModel(nn.Module):
             self.network.to(self.device)
 
         self.lossFunc = lossFunc
-        if hasattr(self.network, 'parmas'):
-            self.optimizer = optimizer(self.network.parmas(lr), lr=lr, weight_decay=4e-5)
-        else:
-            self.optimizer = optimizer(self.network.parameters(),lr=lr,weight_decay=4e-5)
+        # if hasattr(self.network, 'parmas'):
+        #     # self.optimizer = optimizer(self.network.parmas(lr), lr=lr, weight_decay=4e-5)
+        #     self.optimizer = torch.optim.Adam(self.network.parmas(lr), weight_decay=4e-05)
+        # else:
+            # self.optimizer = optimizer(self.network.parameters(),lr=lr,weight_decay=4e-5)
+        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr,weight_decay=4e-05)
+
+
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1)
 
         self.history = history

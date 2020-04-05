@@ -67,7 +67,7 @@ lossFunc = loss.LossFunc(num_classes,reduction="sum").focal_cross_entropy
 # cls = ClassifyModel(num_classes,train_dataset=train_dataset,test_dataset=test_dataset
 #                     ,base_path=base_path,useTensorboard=False)
 
-cls = ClassifyModel(num_classes,epochs=2,
+cls = ClassifyModel(num_classes,epochs=2,lr=2e-3,
                     train_dataset=train_dataset,
                     test_dataset=test_dataset,
                     pred_dataset=pred_dataset,

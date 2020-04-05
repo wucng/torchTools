@@ -129,7 +129,8 @@ def get_img_label(dataPaths=[],classnames=[],counts=25):
     images = []
     for i,path in enumerate(dataPaths):
         if i >= counts:break
-        labels.append(classnames.index(os.path.basename(os.path.dirname(path))))
+        if classnames:
+            labels.append(classnames.index(os.path.basename(os.path.dirname(path))))
         images.append(np.asarray(PIL.Image.open(path).convert("RGB"),np.uint8))
 
     return images,labels

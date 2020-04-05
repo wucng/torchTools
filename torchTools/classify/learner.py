@@ -37,7 +37,7 @@ def get_model(num_classes,droprate):
         nn.Dropout(droprate),
         nn.AdaptiveAvgPool2d((1, 1)),
         Flatten(),
-        nn.Linear(512, num_classes)
+        nn.Linear(2048, num_classes)
     )
     return network
 
@@ -214,10 +214,11 @@ class ClassifyModel(nn.Module):
 
         return imgsPath, labels
 
-    def getTrueAndPred(self):
+    def getTrueAndPred(self,wantFeature=False):
         self.network.eval()
         y_true = []
         y_pred = []
+        feature = []
         with torch.no_grad():
             for data, target in self.test_loader:
                 if self.use_cuda:
@@ -226,4 +227,6 @@ class ClassifyModel(nn.Module):
                 pred = output.max(1, keepdim=True)[1]  # get the index of the max log-probability
                 y_true.extend(target.to("cpu").numpy())
                 y_pred.extend(pred.to("cpu").numpy())
-        return y_true, y_pred
+                if wantFeature:
+                    feature.extend(output.to("cpu").numpy())
+        return y_true, y_pred,feature

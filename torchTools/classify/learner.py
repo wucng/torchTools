@@ -106,10 +106,10 @@ class ClassifyModel(nn.Module):
         if optimizer is None:
             self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr, weight_decay=4e-05)
         else:
-            # if hasattr(self.network, 'parmas'):
+            # if hasattr(self.network, 'params'):
             if callable(self.network.params):
                 print("选择自定义参数")
-                self.optimizer = optimizer(self.network.parmas(lr), lr=lr, weight_decay=4e-5)
+                self.optimizer = optimizer(self.network.params(lr), lr=lr, weight_decay=4e-5)
             else:
                 self.optimizer = optimizer(self.network.parameters(),lr=lr,weight_decay=4e-5)
 

@@ -6,6 +6,7 @@ import torch.nn as nn
 import torchvision
 import numpy as np
 from torch.utils.data import DataLoader, Dataset
+from torch.nn.utils import clip_grad_norm_
 from torchvision import datasets, transforms
 import torchvision
 # from tensorboardX import SummaryWriter
@@ -68,7 +69,8 @@ class ClassifyModel(nn.Module):
                  train_dataset=None,test_dataset=None,pred_dataset=None,
                  network=None, optimizer=None,lossFunc=None,
                  base_path="./",save_model="model.pt",
-                 useTensorboard=False):
+                 useTensorboard=False,useAdvance=False,useParallel=False,parallels=[0]):
+        """parallels:GPU编号"""
         super(ClassifyModel,self).__init__()
         self.num_classes = num_classes
         self.epochs = epochs
@@ -127,6 +129,13 @@ class ClassifyModel(nn.Module):
         self.useTensorboard = useTensorboard
         if useTensorboard:
             self.writer = SummaryWriter(os.path.join(base_path,'runs/experiment'))
+        self.useParallel = useParallel
+        self.useAdvance = useAdvance
+
+        if self.useParallel:
+            self.network = nn.DataParallel(self.network)
+            os.environ["CUDA_VISIBLE_DEVICES"] = ','.join(map(str, parallels))
+
 
     # Train the network for one or more epochs, validating after each epoch.
     def train(self, epoch=0):
@@ -177,6 +186,107 @@ class ClassifyModel(nn.Module):
 
         return train_loss, train_acc
 
+    def accuracy(self, output, target):
+        _, argmax = torch.max(output, 1)
+        accuracy = (target == argmax.squeeze()).float().mean()
+        return accuracy
+
+    def __train(self, epoch=0): # 强化版
+        self.network.train()
+        mixup_alpha = 1.0
+        ricap_beta = 0.3
+        train_loss = 0
+        accs = []
+        num_trains = len(self.train_loader.dataset)
+
+        # 设置一个随机数，来选择增强方式
+        # 1.普通方式
+        # 2.ricap
+        # 3.mixup
+
+        for batch_idx, (data, target) in enumerate(self.train_loader):
+            state = np.random.choice(["general", "ricap", "mixup"], 1)[0]
+
+            if state == "general":
+                data, target = data.to(self.device), target.to(self.device)
+                output = self.network(data)
+                loss = self.lossFunc(output, target)
+                acc = self.accuracy(output, target)
+
+            elif state == "ricap":
+                # ricap 数据随机裁剪组合增强
+                I_x, I_y = data.size()[2:]
+
+                w = int(np.round(I_x * np.random.beta(ricap_beta, ricap_beta)))
+                h = int(np.round(I_y * np.random.beta(ricap_beta, ricap_beta)))
+                w_ = [w, I_x - w, w, I_x - w]
+                h_ = [h, h, I_y - h, I_y - h]
+
+                cropped_images = {}
+                c_ = {}
+                W_ = {}
+                for k in range(4):
+                    idx = torch.randperm(data.size(0))
+                    x_k = np.random.randint(0, I_x - w_[k] + 1)
+                    y_k = np.random.randint(0, I_y - h_[k] + 1)
+                    cropped_images[k] = data[idx][:, :, x_k:x_k + w_[k], y_k:y_k + h_[k]]
+                    # c_[k] = target[idx].cuda()
+                    c_[k] = target[idx].to(self.device)
+                    W_[k] = w_[k] * h_[k] / (I_x * I_y)
+
+                patched_images = torch.cat(
+                    (torch.cat((cropped_images[0], cropped_images[1]), 2),
+                     torch.cat((cropped_images[2], cropped_images[3]), 2)),
+                    3)
+                # patched_images = patched_images.cuda()
+                patched_images = patched_images.to(self.device)
+                output = self.network(patched_images)
+
+                # loss = sum([W_[k] * criterion(output, c_[k]) for k in range(4)])
+                loss = sum([W_[k] * self.lossFunc(output, c_[k]) for k in range(4)])
+
+                # acc = sum([W_[k] * accuracy(output, c_[k])[0] for k in range(4)])
+                acc = sum([W_[k] * self.accuracy(output, c_[k]) for k in range(4)])
+
+            else:  # mixup
+                l = np.random.beta(mixup_alpha, mixup_alpha)
+                idx = torch.randperm(data.size(0))
+                input_a, input_b = data, data[idx]
+                target_a, target_b = target, target[idx]
+
+                mixed_input = l * input_a + (1 - l) * input_b
+
+                target_a = target_a.to(self.device)
+                target_b = target_b.to(self.device)
+                mixed_input = mixed_input.to(self.device)
+                output = self.network(mixed_input)
+                # loss = l * criterion(output, target_a) + (1 - l) * criterion(output, target_b)
+                loss = l * self.lossFunc(output, target_a) + (1 - l) * self.lossFunc(output, target_b)
+                # acc = l * accuracy(output, target_a)[0] + (1 - l) * accuracy(output, target_b)[0]
+                acc = l * self.accuracy(output, target_a) + (1 - l) * self.accuracy(output, target_b)
+
+            train_loss += loss.item()
+            loss /= len(data)
+            self.optimizer.zero_grad()
+            loss.backward()
+            clip_grad_norm_(model.parameters(), 1.0 - 1e-10)  # 梯度裁剪
+            self.optimizer.step()
+
+            accs.append(acc.item())
+
+            if batch_idx % 20 == 0:
+                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
+                    epoch, batch_idx * len(data), num_trains,
+                           100. * batch_idx * len(data) / num_trains, loss.item()))
+
+        train_loss /= num_trains
+        train_acc = np.mean(accs)
+
+        print('Train, Average Loss: {:.6f}\t,acc:{:.6f}'.format(
+            train_loss, train_acc))
+
+        return train_acc, train_loss
+
     # Test the network
     def test(self, epoch=0):
         self.network.eval()
@@ -206,7 +316,10 @@ class ClassifyModel(nn.Module):
 
     def fit(self):
         for e in range(self.epochs):
-            train_loss, train_acc = self.train(e + 1)
+            if self.useAdvance:
+                train_loss, train_acc = self.__train(e + 1)
+            else:
+                train_loss, train_acc = self.train(e + 1)
             test_loss, test_acc = self.test(e + 1)
             torch.save(self.network.state_dict(), self.save_model)  # save models
 

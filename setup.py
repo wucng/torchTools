@@ -44,19 +44,30 @@ setup(
     author='wucng',  # 作者
     author_email='goodtensorflow@gmail.com',  # 你的邮箱**
     url='https://github.com/wucng/',  # 可以写github上的地址，或者其他地址
-    packages = find_packages('torchTools'),  # 包含所有torchTools中的包
-    package_dir = {'':'torchTools'},   # 告诉distutils包都在torchTools下
+    download_url='',
+    packages = find_packages(),  # 包含所有torchTools中的包
 
     # 依赖包
     install_requires=requirements,
-    license="GNU GPL v3",
+    license="MIT",
     zip_safe=False,
-    keywords='torch',
+    keywords=['torch',"computer vision","deep learning"],
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: GNU GPL v3',
-        'Natural Language :: English',
-        'Programming Language :: Python :: 3'
-    ],
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Science/Research",
+        "Intended Audience :: Developers",
+        "Intended Audience :: Information Technology",
+        "License :: OSI Approved :: MIT License",
+        "Natural Language :: English",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.4",
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
+        "Topic :: Scientific/Engineering :: Artificial Intelligence",
+        "Topic :: Scientific/Engineering :: Image Recognition",
+        "Topic :: Software Development :: Libraries :: Python Modules"
+    ]
 )

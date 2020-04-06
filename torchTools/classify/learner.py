@@ -110,7 +110,7 @@ class ClassifyModel(nn.Module):
         else:
             # if hasattr(self.network, 'params'):
             if callable(self.network.params):
-                print("选择自定义参数")
+                # print("选择自定义参数")
                 self.optimizer = optimizer(self.network.params(lr), lr=lr, weight_decay=4e-5)
             else:
                 self.optimizer = optimizer(self.network.parameters(),lr=lr,weight_decay=4e-5)
@@ -269,7 +269,7 @@ class ClassifyModel(nn.Module):
             loss /= len(data)
             self.optimizer.zero_grad()
             loss.backward()
-            clip_grad_norm_(model.parameters(), 1.0 - 1e-10)  # 梯度裁剪
+            clip_grad_norm_(self.network.parameters(), 1.0 - 1e-10)  # 梯度裁剪
             self.optimizer.step()
 
             accs.append(acc.item())

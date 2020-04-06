@@ -11,21 +11,12 @@
 ! cd .. && rm -rf torchTools
 """
 
-# from torchTools.classify.dataProcess import loadData,dataAugment
-# from torchTools.classify.visual import tool
-# from torchTools.classify.network import net
-# from torchTools.classify.optimizer import optimizer
-# from torchTools.classify.loss import loss
-# from torchTools.classify.learner import ClassifyModel
-
-# import torchTools.torchTools.classify as classify
-from torchTools.torchTools.classify.dataProcess import loadData,dataAugment
-from torchTools.torchTools.classify.visual import tool
-from torchTools.torchTools.classify.network import net
-from torchTools.torchTools.classify.optimizer import optimizer
-from torchTools.torchTools.classify.loss import loss
-from torchTools.torchTools.classify.learner import ClassifyModel
-
+from torchTools.classify.dataProcess import loadData,dataAugment
+from torchTools.classify.visual import tool
+from torchTools.classify.network import net
+from torchTools.classify.optimizer import optimizer
+from torchTools.classify.loss import loss
+from torchTools.classify.learner import ClassifyModel
 import numpy as np
 import os
 

@@ -2,14 +2,6 @@
 ```py
 # https://www.kaggle.com/puneet6060/intel-image-classification
 # https://github.com/wucng/torchTools
-"""
-# 安装成功但是导入包出错
-!pip install git+https://github.com/wucng/torchTools.git
-
-# 方式二
-! git clone https://github.com/wucng/torchTools.git && cd torchTools && python setup.py install
-! cd .. && rm -rf torchTools
-"""
 
 from torchTools.classify.dataProcess import loadData,dataAugment
 from torchTools.classify.visual import tool
@@ -54,10 +46,14 @@ optimizer = optimizer.RAdam
 
 lossFunc = loss.LossFunc(num_classes,reduction="sum").focal_cross_entropy
 
+# 简化版
+cls = ClassifyModel(num_classes,
+					train_dataset=train_dataset,
+					test_dataset=test_dataset,
+                    base_path=base_path,
+					useTensorboard=False)
 
-# cls = ClassifyModel(num_classes,train_dataset=train_dataset,test_dataset=test_dataset
-#                     ,base_path=base_path,useTensorboard=False)
-
+# 自定义版
 cls = ClassifyModel(num_classes,epochs=2,lr=2e-3,
                     train_dataset=train_dataset,
                     test_dataset=test_dataset,
@@ -67,6 +63,21 @@ cls = ClassifyModel(num_classes,epochs=2,lr=2e-3,
                     lossFunc=lossFunc,
                     base_path=base_path,
                     useTensorboard=True)
+
+# 进阶版
+cls = ClassifyModel(num_classes,epochs=1,lr=2e-3,
+                    train_dataset=train_dataset,
+                    test_dataset=test_dataset,
+                    pred_dataset=pred_dataset,
+                    network=network,
+                    optimizer=optimizer,
+                    lossFunc=lossFunc, 
+                    base_path=base_path,  # 输出文件保存的根目录
+                    useTensorboard=False, # 是否使用Tensorboard
+					useAdvance=True,      # 是否使用进一步的数据增强（ricap，mixup）
+					useParallel=True,     # 是否启用数据并行
+					parallels=[0]         # 指定GPU编号
+					)
 
 cls.fit()
 

@@ -35,7 +35,9 @@ images,labels = tool.get_img_label(train_datas,classnames,counts=25)
 tool.plot_images(images,labels)
 
 
-train_transformations,test_transformations = dataAugment.get_transforms((256, 256),(224,224))
+# train_transformations,test_transformations = dataAugment.get_transforms((256, 256),(224,224))
+# 结合imgaug做数据增强
+train_transformations,test_transformations = dataAugment.get_transforms_height((256, 256),(224,224))
 train_dataset = loadData.Data_train_valid2(train_datas,classnames,train_transformations)
 test_dataset = loadData.Data_train_valid2(valid_datas,classnames,test_transformations)
 pred_dataset = loadData.Data_pred(pred_datasPath,test_transformations)

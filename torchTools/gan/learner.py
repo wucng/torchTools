@@ -177,13 +177,12 @@ class GANModel(nn.Module):
 
 
     # Train the network for one or more epochs, validating after each epoch.
-    def train(self, epoch=0):
-        self.network.train()
-        train_loss = 0
-        correct = 0  # 正确的个数
+    def train(self, epoch):
+        self.dnetwork.train()
+        self.gnetwork.train()
+
         num_trains = len(self.train_loader.dataset)
         for batch, (data, target) in enumerate(self.train_loader):
-            # data, target = Variable(data), Variable(target)
             if self.use_cuda:
                 data, target = data.to(self.device), target.to(self.device)
 
@@ -195,37 +194,31 @@ class GANModel(nn.Module):
             real_label = torch.full((b_size,), 1, device=self.device, requires_grad=False)
             fake_label = torch.full((b_size,), 0, device=self.device, requires_grad=False)
 
-            self.doptimizer.zero_grad()
+            self.dnetwork.zero_grad()
+            # or
+            # self.doptimizer.zero_grad()
             fixed_noise = torch.randn(b_size, self.nz, 1, 1, device=self.device)
             fake = self.gnetwork(fixed_noise)
             fout = self.dnetwork(fake.detach())
             tout = self.dnetwork(data)
-            d_loss = self.lossFunc(tout, real_label, reduction="mean") + \
-                     self.lossFunc(fout,fake_label,reduction="mean")
+            d_loss = self.lossFunc(tout, real_label) + \
+                     self.lossFunc(fout,fake_label)
+
             d_loss.backward()
-            # Update D
             self.doptimizer.step()
 
             ############################
             # (2) Update G network: maximize log(D(G(z)))
             ###########################
-            self.goptimizer.zero_grad()
+            self.gnetwork.zero_grad()
+            # or
+            # self.goptimizer.zero_grad()
             fout = self.dnetwork(fake)
-            g_loss = self.lossFunc(fout, real_label, reduction="mean")
+            g_loss = self.lossFunc(fout, real_label)
             g_loss.backward()
+
             # Update G
             self.goptimizer.step()
-
-            self.optimizer.zero_grad()
-            output = self.network(data)
-            loss = self.lossFunc(output, target)
-            train_loss += loss.item()
-            loss /= len(data)
-            loss.backward()
-            self.optimizer.step()
-
-            pred = output.max(1, keepdim=True)[1]  # get the index of the max log-probability
-            correct += pred.eq(target.view_as(pred)).sum().item()
 
             if batch % self.log_interval == 0:
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tDLoss: {:.6f} GLoss: {:.6f}'.format(epoch, batch * len(data),

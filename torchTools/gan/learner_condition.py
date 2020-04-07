@@ -275,7 +275,7 @@ class GANModel(nn.Module):
                                                                                               d_loss.data.item(),
                                                                                               g_loss.data.item()))
 
-    def predict(self):
+    def predict(self,target):
         # if os.path.exists(self.save_gmodel):
         #     self.gnetwork.load_state_dict(torch.load(self.save_gmodel))
         self.gnetwork.eval()
@@ -303,9 +303,10 @@ class GANModel(nn.Module):
             plt.show()
 
     def fit(self):
+        target = torch.randint(0,self.num_classes,[64],dtype=torch.long,device=self.device)
         for e in range(self.epochs):
             self.train(e+1)
-            self.predict()
+            self.predict(target)
 
             torch.save(self.dnetwork.state_dict(), self.save_dmodel)  # save models
             torch.save(self.gnetwork.state_dict(), self.save_gmodel)  # save models

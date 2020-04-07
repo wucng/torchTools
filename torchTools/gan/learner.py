@@ -302,7 +302,11 @@ class GANModel(nn.Module):
             # PIL.Image.fromarray(imgs.squeeze(-1)).show()
             # PIL.Image.fromarray(imgs.squeeze(-1)).save("test.jpg")
             # print("保存成功")
-            plt.imshow(imgs.squeeze(-1),cmap="gray" if self.nc==1 else None)
+            if self.nc == 1:
+                plt.imshow(imgs.squeeze(-1), cmap="gray")
+            else:
+                plt.imshow(imgs, cmap=None)
+            # plt.imshow(imgs.squeeze(-1),cmap="gray" if self.nc==1 else None)
             plt.show()
 
     def fit(self):

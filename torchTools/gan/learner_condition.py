@@ -262,7 +262,7 @@ class GANModel(nn.Module):
             # or
             # self.goptimizer.zero_grad()
             fout = self.dnetwork(fake,target)
-            g_loss = self.lossFunc(fout, real_label)
+            g_loss = self.lossFunc(fout, real_label)+0.2*F.mse_loss(fout,data)
             g_loss.backward()
 
             # Update G

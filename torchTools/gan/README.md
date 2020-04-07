@@ -105,7 +105,7 @@ gnetwork = nn.Sequential(
         nn.BatchNorm2d(ngf),
         nn.ReLU(True),
 
-        nn.ConvTranspose2d( ngf*2, nc, 4, 2, 1, bias=False),
+        nn.ConvTranspose2d( ngf, nc, 4, 2, 1, bias=False),
         # nn.Sigmoid(), # 对应图像 norm 0.~1.
         nn.Tanh() # 对应图像norm -1.0~1.0
 )

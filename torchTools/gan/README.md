@@ -127,4 +127,35 @@ gan = GANModel(nc=nc,nz=nz,
 			   gnetwork = gnetwork,
 			   base_path="/kaggle/working/")
 gan.fit()
+
+
+import numpy as np
+import PIL.Image
+import os
+
+def predict():
+        # if os.path.exists(self.save_gmodel):
+        #     self.gnetwork.load_state_dict(torch.load(self.save_gmodel))
+        gan.gnetwork.eval()
+        with torch.no_grad():
+            fixed_noise = torch.randn(64, gan.nz, 1, 1, device=gan.device)  # 随机噪声数据
+            decode = gan.gnetwork(fixed_noise)
+
+            # decode得到的图片
+            # decode = torch.clamp(decode * 255, 0, 255)  # 对应0~1
+            decode = torch.clamp((decode * 0.5 + 0.5) * 255, 0, 255) # -1.0~1.0
+            decode = decode.detach().cpu().numpy().astype(np.uint8)
+            decode = np.transpose(decode, [0, 2, 3, 1])
+
+            imgs = np.zeros([8 * gan.image_size, 8 * gan.image_size, gan.nc], np.uint8)
+            for i in range(8):
+                for j in range(8):
+                    imgs[i * gan.image_size:(i + 1) * gan.image_size, j * gan.image_size:(j + 1) * gan.image_size] = \
+                    decode[i * 8 + j]
+
+            # 保存
+            PIL.Image.fromarray(imgs).save(os.path.join(gan.base_path,"test.jpg"))
+            print("保存成功")
+			
+predict()
 ```

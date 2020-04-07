@@ -123,7 +123,6 @@ class GANModel(nn.Module):
         self.nz = nz
         self.nc = nc
 
-        self.train_dataset = train_dataset
         if train_dataset is not None:
             self.train_loader = DataLoader(train_dataset,batch_size=self.batch_size,shuffle=True,**kwargs)
         else:
@@ -187,96 +186,50 @@ class GANModel(nn.Module):
 
         num_trains = len(self.train_loader.dataset)
 
-        if self.train_dataset is not None:
-            for batch, (data,) in enumerate(self.train_loader):
-                if self.use_cuda:
-                    data = data.to(self.device)
+        for batch, (data, target) in enumerate(self.train_loader):
+            if self.use_cuda:
+                data, target = data.to(self.device), target.to(self.device)
 
-                ############################
-                # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-                ###########################
+            ############################
+            # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
+            ###########################
 
-                b_size = data.size(0)
-                real_label = torch.full((b_size,), 1, device=self.device, requires_grad=False)
-                fake_label = torch.full((b_size,), 0, device=self.device, requires_grad=False)
+            b_size = data.size(0)
+            real_label = torch.full((b_size,), 1, device=self.device, requires_grad=False)
+            fake_label = torch.full((b_size,), 0, device=self.device, requires_grad=False)
 
-                self.dnetwork.zero_grad()
-                # or
-                # self.doptimizer.zero_grad()
-                fixed_noise = torch.randn(b_size, self.nz, 1, 1, device=self.device)
-                fake = self.gnetwork(fixed_noise)
-                fout = self.dnetwork(fake.detach())
-                tout = self.dnetwork(data)
-                d_loss = self.lossFunc(tout, real_label) + \
-                         self.lossFunc(fout,fake_label)
+            self.dnetwork.zero_grad()
+            # or
+            # self.doptimizer.zero_grad()
+            fixed_noise = torch.randn(b_size, self.nz, 1, 1, device=self.device)
+            fake = self.gnetwork(fixed_noise)
+            fout = self.dnetwork(fake.detach())
+            tout = self.dnetwork(data)
+            d_loss = self.lossFunc(tout, real_label) + \
+                     self.lossFunc(fout,fake_label)
 
-                d_loss.backward()
-                self.doptimizer.step()
+            d_loss.backward()
+            self.doptimizer.step()
 
-                ############################
-                # (2) Update G network: maximize log(D(G(z)))
-                ###########################
-                self.gnetwork.zero_grad()
-                # or
-                # self.goptimizer.zero_grad()
-                fout = self.dnetwork(fake)
-                g_loss = self.lossFunc(fout, real_label)+0.2*F.mse_loss(fout,data)
-                g_loss.backward()
+            ############################
+            # (2) Update G network: maximize log(D(G(z)))
+            ###########################
+            self.gnetwork.zero_grad()
+            # or
+            # self.goptimizer.zero_grad()
+            fout = self.dnetwork(fake)
+            g_loss = self.lossFunc(fout, real_label)+0.2*F.mse_loss(fout,data)
+            g_loss.backward()
 
-                # Update G
-                self.goptimizer.step()
+            # Update G
+            self.goptimizer.step()
 
-                if batch % self.log_interval == 0:
-                    print('Train Epoch: {} [{}/{} ({:.0f}%)]\tDLoss: {:.6f} GLoss: {:.6f}'.format(epoch, batch * len(data),
-                                                                                                  num_trains,
-                                                                                                  100. * batch / num_trains,
-                                                                                                  d_loss.data.item(),
-                                                                                                  g_loss.data.item()))
-        else:
-            for batch, (data, target) in enumerate(self.train_loader):
-                if self.use_cuda:
-                    data, target = data.to(self.device), target.to(self.device)
-
-                ############################
-                # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-                ###########################
-
-                b_size = data.size(0)
-                real_label = torch.full((b_size,), 1, device=self.device, requires_grad=False)
-                fake_label = torch.full((b_size,), 0, device=self.device, requires_grad=False)
-
-                self.dnetwork.zero_grad()
-                # or
-                # self.doptimizer.zero_grad()
-                fixed_noise = torch.randn(b_size, self.nz, 1, 1, device=self.device)
-                fake = self.gnetwork(fixed_noise)
-                fout = self.dnetwork(fake.detach())
-                tout = self.dnetwork(data)
-                d_loss = self.lossFunc(tout, real_label) + \
-                         self.lossFunc(fout,fake_label)
-
-                d_loss.backward()
-                self.doptimizer.step()
-
-                ############################
-                # (2) Update G network: maximize log(D(G(z)))
-                ###########################
-                self.gnetwork.zero_grad()
-                # or
-                # self.goptimizer.zero_grad()
-                fout = self.dnetwork(fake)
-                g_loss = self.lossFunc(fout, real_label)+0.2*F.mse_loss(fout,data)
-                g_loss.backward()
-
-                # Update G
-                self.goptimizer.step()
-
-                if batch % self.log_interval == 0:
-                    print('Train Epoch: {} [{}/{} ({:.0f}%)]\tDLoss: {:.6f} GLoss: {:.6f}'.format(epoch, batch * len(data),
-                                                                                                  num_trains,
-                                                                                                  100. * batch / num_trains,
-                                                                                                  d_loss.data.item(),
-                                                                                                  g_loss.data.item()))
+            if batch % self.log_interval == 0:
+                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tDLoss: {:.6f} GLoss: {:.6f}'.format(epoch, batch * len(data),
+                                                                                              num_trains,
+                                                                                              100. * batch / num_trains,
+                                                                                              d_loss.data.item(),
+                                                                                              g_loss.data.item()))
 
     def predict(self):
         # if os.path.exists(self.save_gmodel):

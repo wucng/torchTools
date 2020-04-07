@@ -227,7 +227,7 @@ class GANModel(nn.Module):
             if batch % self.log_interval == 0:
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tDLoss: {:.6f} GLoss: {:.6f}'.format(epoch, batch * len(data),
                                                                                               num_trains,
-                                                                                              100. * batch / num_trains,
+                                                                                              100. * batch * len(data) / num_trains,
                                                                                               d_loss.data.item(),
                                                                                               g_loss.data.item()))
 

@@ -1,5 +1,5 @@
 """
-普通GAN
+条件GAN
 """
 from __future__ import print_function
 import os
@@ -29,12 +29,24 @@ class Flatten(nn.Module):
 
 # 自定义模型
 class Discriminator(nn.Module):
-    def __init__(self, nc = 3,ndf = 64):
+    def __init__(self, nc = 3,ndf = 64,num_classes=10):
         super(Discriminator, self).__init__()
+        self.num_classes = num_classes
+
+        self._conv1_1 = nn.Sequential(
+            nn.Conv2d(nc, ndf // 2, 4, stride=2, padding=1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+        self._conv1_2 = nn.Sequential(
+            nn.Conv2d(num_classes, ndf // 2, 4, stride=2, padding=1, bias=False),
+            nn.LeakyReLU(0.2, inplace=True)
+        )
+
         self.main = nn.Sequential(
             # input is (nc) x 64 x 64
-            nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
-            nn.LeakyReLU(0.2, inplace=True),
+            # nn.Conv2d(nc, ndf, 4, 2, 1, bias=False),
+            # nn.LeakyReLU(0.2, inplace=True),
+
             # state size. (ndf) x 32 x 32
             nn.Conv2d(ndf, ndf * 2, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ndf * 2),
@@ -54,17 +66,42 @@ class Discriminator(nn.Module):
             nn.Sigmoid()
         )
 
-    def forward(self, input):
-        return self.main(input)
+    def forward(self, x,y):
+        bs, _, img_h, img_w = x.size()
+        y = F.one_hot(y.long(), self.num_classes).float()
+        y = y[..., None, None]
+        y = y.expand((bs, self.num_classes, img_h, img_w))
+
+        x = self._conv1_1(x)
+        y = self._conv1_2(y)
+
+        x = torch.cat([x, y], 1)
+        x = self.main(x)
+        return x
 
 class Generator(nn.Module):
-    def __init__(self,nc=3, nz = 100,ngf = 64):
+    def __init__(self,nc=3, nz = 100,ngf = 64,num_classes = 10):
         super(Generator, self).__init__()
+        self.num_classes = num_classes
+
+        self.deconv1_1 = nn.Sequential(
+            nn.ConvTranspose2d(nz, ngf * 4, 4, 1, 0, bias=False),  # [512,4,4]
+            nn.BatchNorm2d(ngf * 4),
+            nn.ReLU(True),
+        )
+
+        self.deconv1_2 = nn.Sequential(
+            nn.ConvTranspose2d(num_classes, ngf * 4, 4, 1, 0, bias=False),  # [512,4,4]
+            nn.BatchNorm2d(ngf * 4),
+            nn.ReLU(True),
+        )
+
         self.main = nn.Sequential(
             # input is Z, going into a convolution
-            nn.ConvTranspose2d( nz, ngf * 8, 4, 1, 0, bias=False),
-            nn.BatchNorm2d(ngf * 8),
-            nn.ReLU(True),
+            # nn.ConvTranspose2d( nz, ngf * 8, 4, 1, 0, bias=False),
+            # nn.BatchNorm2d(ngf * 8),
+            # nn.ReLU(True),
+
             # state size. (ngf*8) x 4 x 4
             nn.ConvTranspose2d(ngf * 8, ngf * 4, 4, 2, 1, bias=False),
             nn.BatchNorm2d(ngf * 4),
@@ -81,14 +118,21 @@ class Generator(nn.Module):
 
             # state size. (ngf) x 32 x 32
             nn.ConvTranspose2d( ngf*2, nc, 4, 2, 1, bias=False),
-            # nn.Sigmoid(), # 对应图像 norm 0.~1.
-            nn.Tanh() # 对应图像norm -1.0~1.0
-
+            nn.Tanh()
             # state size. (nc) x 64 x 64
         )
 
-    def forward(self, input):
-        return self.main(input)
+    def forward(self, x,y):
+        bs, _, img_h, img_w = x.size()
+        y = F.one_hot(y.long(), self.num_classes).float()
+        y = y[..., None, None]
+        y = y.expand((bs, self.num_classes, img_h, img_w))
+
+        x = self.deconv1_1(x)
+        y = self.deconv1_2(y)
+
+        x = torch.cat([x, y], 1)
+        return self.main(x)
 
 # custom weights initialization called on netG and netD
 def weights_init(m):
@@ -101,13 +145,14 @@ def weights_init(m):
 
 
 class GANModel(nn.Module):
-    def __init__(self,nc=3,nz=100,epochs=10,droprate=0.5,lr=2e-4,image_size=32,
+    def __init__(self,num_classes,nc=3,nz=100,epochs=10,droprate=0.5,lr=2e-4,image_size=32,
                  batch_size=32,test_batch_size=64,log_interval=30,
                  train_dataset=None,dnetwork=None,gnetwork=None,
                  optimizer=None,lossFunc=None,
                  base_path="./",save_model="model.pt"):
         """parallels:GPU编号"""
         super(GANModel,self).__init__()
+        self.num_classes = num_classes
         self.epochs = epochs
         self.droprate = droprate
         self.batch_size = batch_size
@@ -123,7 +168,6 @@ class GANModel(nn.Module):
         self.nz = nz
         self.nc = nc
 
-        self.train_dataset = train_dataset
         if train_dataset is not None:
             self.train_loader = DataLoader(train_dataset,batch_size=self.batch_size,shuffle=True,**kwargs)
         else:
@@ -137,12 +181,12 @@ class GANModel(nn.Module):
             ])),batch_size=self.batch_size,shuffle=True, **kwargs)
 
         if dnetwork is None:
-            self.dnetwork = Discriminator(self.nc)
+            self.dnetwork = Discriminator(self.nc,num_classes=self.num_classes)
         else:
             self.dnetwork = dnetwork
 
         if gnetwork is None:
-            self.gnetwork = Generator(self.nc,nz=self.nz)
+            self.gnetwork = Generator(self.nc,nz=self.nz,num_classes=self.num_classes)
         else:
             self.gnetwork = gnetwork
 
@@ -186,97 +230,50 @@ class GANModel(nn.Module):
         self.gnetwork.train()
 
         num_trains = len(self.train_loader.dataset)
+        for batch, (data, target) in enumerate(self.train_loader):
+            if self.use_cuda:
+                data, target = data.to(self.device), target.to(self.device)
 
-        if self.train_dataset is not None:
-            for batch, (data,) in enumerate(self.train_loader):
-                if self.use_cuda:
-                    data = data.to(self.device)
+            ############################
+            # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
+            ###########################
 
-                ############################
-                # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-                ###########################
+            b_size = data.size(0)
+            real_label = torch.full((b_size,), 1, device=self.device, requires_grad=False)
+            fake_label = torch.full((b_size,), 0, device=self.device, requires_grad=False)
 
-                b_size = data.size(0)
-                real_label = torch.full((b_size,), 1, device=self.device, requires_grad=False)
-                fake_label = torch.full((b_size,), 0, device=self.device, requires_grad=False)
+            self.dnetwork.zero_grad()
+            # or
+            # self.doptimizer.zero_grad()
+            fixed_noise = torch.randn(b_size, self.nz, 1, 1, device=self.device)
+            fake = self.gnetwork(fixed_noise,target)
+            fout = self.dnetwork(fake.detach(),target)
+            tout = self.dnetwork(data,target)
+            d_loss = self.lossFunc(tout, real_label) + \
+                     self.lossFunc(fout,fake_label)
 
-                self.dnetwork.zero_grad()
-                # or
-                # self.doptimizer.zero_grad()
-                fixed_noise = torch.randn(b_size, self.nz, 1, 1, device=self.device)
-                fake = self.gnetwork(fixed_noise)
-                fout = self.dnetwork(fake.detach())
-                tout = self.dnetwork(data)
-                d_loss = self.lossFunc(tout, real_label) + \
-                         self.lossFunc(fout,fake_label)
+            d_loss.backward()
+            self.doptimizer.step()
 
-                d_loss.backward()
-                self.doptimizer.step()
+            ############################
+            # (2) Update G network: maximize log(D(G(z)))
+            ###########################
+            self.gnetwork.zero_grad()
+            # or
+            # self.goptimizer.zero_grad()
+            fout = self.dnetwork(fake,target)
+            g_loss = self.lossFunc(fout, real_label)
+            g_loss.backward()
 
-                ############################
-                # (2) Update G network: maximize log(D(G(z)))
-                ###########################
-                self.gnetwork.zero_grad()
-                # or
-                # self.goptimizer.zero_grad()
-                fout = self.dnetwork(fake)
-                g_loss = self.lossFunc(fout, real_label)
-                g_loss.backward()
+            # Update G
+            self.goptimizer.step()
 
-                # Update G
-                self.goptimizer.step()
-
-                if batch % self.log_interval == 0:
-                    print('Train Epoch: {} [{}/{} ({:.0f}%)]\tDLoss: {:.6f} GLoss: {:.6f}'.format(epoch, batch * len(data),
-                                                                                                  num_trains,
-                                                                                                  100. * batch / num_trains,
-                                                                                                  d_loss.data.item(),
-                                                                                                  g_loss.data.item()))
-        else:
-            for batch, (data, target) in enumerate(self.train_loader):
-                if self.use_cuda:
-                    data, target = data.to(self.device), target.to(self.device)
-
-                ############################
-                # (1) Update D network: maximize log(D(x)) + log(1 - D(G(z)))
-                ###########################
-
-                b_size = data.size(0)
-                real_label = torch.full((b_size,), 1, device=self.device, requires_grad=False)
-                fake_label = torch.full((b_size,), 0, device=self.device, requires_grad=False)
-
-                self.dnetwork.zero_grad()
-                # or
-                # self.doptimizer.zero_grad()
-                fixed_noise = torch.randn(b_size, self.nz, 1, 1, device=self.device)
-                fake = self.gnetwork(fixed_noise)
-                fout = self.dnetwork(fake.detach())
-                tout = self.dnetwork(data)
-                d_loss = self.lossFunc(tout, real_label) + \
-                         self.lossFunc(fout,fake_label)
-
-                d_loss.backward()
-                self.doptimizer.step()
-
-                ############################
-                # (2) Update G network: maximize log(D(G(z)))
-                ###########################
-                self.gnetwork.zero_grad()
-                # or
-                # self.goptimizer.zero_grad()
-                fout = self.dnetwork(fake)
-                g_loss = self.lossFunc(fout, real_label)
-                g_loss.backward()
-
-                # Update G
-                self.goptimizer.step()
-
-                if batch % self.log_interval == 0:
-                    print('Train Epoch: {} [{}/{} ({:.0f}%)]\tDLoss: {:.6f} GLoss: {:.6f}'.format(epoch, batch * len(data),
-                                                                                                  num_trains,
-                                                                                                  100. * batch / num_trains,
-                                                                                                  d_loss.data.item(),
-                                                                                                  g_loss.data.item()))
+            if batch % self.log_interval == 0:
+                print('Train Epoch: {} [{}/{} ({:.0f}%)]\tDLoss: {:.6f} GLoss: {:.6f}'.format(epoch, batch * len(data),
+                                                                                              num_trains,
+                                                                                              100. * batch / num_trains,
+                                                                                              d_loss.data.item(),
+                                                                                              g_loss.data.item()))
 
     def predict(self):
         # if os.path.exists(self.save_gmodel):
@@ -284,7 +281,7 @@ class GANModel(nn.Module):
         self.gnetwork.eval()
         with torch.no_grad():
             fixed_noise = torch.randn(64, self.nz, 1, 1, device=self.device)  # 随机噪声数据
-            decode = self.gnetwork(fixed_noise)
+            decode = self.gnetwork(fixed_noise,target)
 
             # decode得到的图片
             # decode = torch.clamp(decode * 255, 0, 255)  # 对应0~1

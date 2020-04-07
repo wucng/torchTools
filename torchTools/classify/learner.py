@@ -168,7 +168,7 @@ class ClassifyModel(nn.Module):
             if batch % self.log_interval == 0:
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(epoch, batch * len(data),
                                                                                len(self.train_loader.dataset),
-                                                                               100. * batch / len(
+                                                                               100. * batch * len(data) / len(
                                                                                    self.train_loader),
                                                                                loss.data.item()))
 

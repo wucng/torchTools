@@ -14,10 +14,10 @@ import random
 
 from torchvision.transforms import functional as F
 from torch.nn import functional as F2
-# try:
-#     from .uils import *
-# except:
-#     from uils import *
+try:
+    from .uils import *
+except:
+    from uils import *
 
 # ----------------------------------------------------------------------------------
 class Augment(object):

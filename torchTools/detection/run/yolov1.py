@@ -207,10 +207,10 @@ class YOLOV1(nn.Module):
                 if self.use_cuda:
                     data = data.to(self.device)
                     # data = [d.to(self.device) for d in data]
-                    target = [{k: v.to(self.device) for k, v in targ.items()} for targ in target]
+                    new_target = [{k: v.to(self.device) for k, v in targ.items() if k!="path"} for targ in target]
 
                 output = self.network(data)
-                preds = self.loss_func(output,target)
+                preds = self.loss_func(output,new_target)
 
                 for i in range(len(target)):
                     pred = preds[i]

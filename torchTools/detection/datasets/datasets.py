@@ -308,7 +308,7 @@ class PennFudanDataset(Dataset):
     unzip PennFudanPed.zip
     """
     def __init__(self, root, transforms=None):
-        root=os.path.join(root,"PennFudanPed")
+        # root=os.path.join(root,"PennFudanPed")
         self.root = root
         self.transforms = transforms
         # load all image files, sorting them to

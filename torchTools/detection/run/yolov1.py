@@ -66,7 +66,18 @@ class YOLOV1(nn.Module):
                               [bboxAug.Pad(), bboxAug.Resize(resize, mulScale)],
                               [bboxAug.Resize2(resize, mulScale)]
                           ]),
-                          bboxAug.Augment(advanced),
+                          # ---------两者取其一--------------------
+                          bboxAug.RandomHorizontalFlip(),
+                          bboxAug.RandomTranslate(),
+                          bboxAug.RandomRotate(3),
+                          bboxAug.RandomBrightness(),
+                          bboxAug.RandomSaturation(),
+                          bboxAug.RandomHue(),
+                          bboxAug.RandomBlur(),
+
+                          # bboxAug.Augment(advanced),
+                          # -------------------------------
+
                           bboxAug.ToTensor(),  # PIL --> tensor
                           bboxAug.Normalize() # tensor --> tensor
                       ]))

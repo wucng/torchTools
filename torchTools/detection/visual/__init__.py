@@ -1,1 +1,1 @@
-from . import matplot,opencv,pillow,colormap
+from . import matplot,opencv,pillow

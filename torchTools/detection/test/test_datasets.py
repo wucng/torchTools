@@ -24,7 +24,7 @@ def collate_fn(batch_data):
 
 
 def test_datasets():
-    root = "C:/Users/MI/Documents/GitHub/"
+    root = "C:/Users/MI/Documents/GitHub/PennFudanPed/"
     seed = 100
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -45,12 +45,12 @@ def test_datasets():
                #     bboxAug.RandomScale(),
                #     bboxAug.RandomDrop((0.05, 0.05)),
                # ]),
-               bboxAug.RandomChoice(),
+               # bboxAug.RandomChoice(),
                *random.choice([
-                   [bboxAug.Pad(),bboxAug.Resize((256,256),True)],
+                   # [bboxAug.Pad(),bboxAug.Resize((256,256),True)],
                    [bboxAug.Resize2((256,256),True)]
                ]),
-               bboxAug.Augment(True),
+               # bboxAug.Augment(True),
                bboxAug.ToTensor(), # PIL --> tensor
                # bboxAug.Normalize() # tensor --> tensor
            ]))

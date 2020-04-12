@@ -42,7 +42,7 @@ class YOLOV1(nn.Module):
                  num_classes=20,
                  threshold_conf=0.5,threshold_cls=0.5, #  # 0.05,0.5
                  conf_thres=0.5,nms_thres=0.4, # 0.8,0.4
-                 filter_labels = []):
+                 filter_labels = [],classes=[]):
         super(YOLOV1,self).__init__()
 
         self.batch_size = batch_size
@@ -50,6 +50,7 @@ class YOLOV1(nn.Module):
         self.print_freq = print_freq
         self.isTrain = isTrain
         self.mulScale = mulScale
+        self.classes = classes
 
         # seed = 100
         seed = int(time.time() * 1000)
@@ -217,7 +218,7 @@ class YOLOV1(nn.Module):
                     path = target[i]["path"]
                     image = np.asarray(PIL.Image.open(path).convert("RGB"), np.uint8)
                     # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-                    image = draw_rect(image,pred)
+                    image = draw_rect(image,pred,self.classes)
 
                     # cv2.imshow("test", image)
                     # cv2.waitKey(0)
@@ -230,7 +231,7 @@ class YOLOV1(nn.Module):
     def predict(self):
         pass
 
-def draw_rect(image,pred):
+def draw_rect(image,pred,classes):
     labels = pred["labels"]
     bboxs = pred["boxes"]
     scores = pred["scores"]
@@ -251,6 +252,6 @@ if __name__=="__main__":
     # testdataPath = "/kaggle/input/PennFudanPed/PNGImages/"
     testdataPath = "C:/Users/MI/Documents/GitHub/PennFudanPed/PNGImages/"
     # traindataPath = "/kaggle/input/"
-    traindataPath = "C:/Users/MI/Documents/GitHub"
+    traindataPath = "C:/Users/MI/Documents/GitHub/PennFudanPed/"
     model = YOLOV1(traindataPath,testdataPath,isTrain=True,num_anchors=2,num_classes=1,mulScale=True)
     model()

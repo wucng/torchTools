@@ -211,9 +211,9 @@ class YOLOV1(nn.Module):
                     # cv2.imshow("test", image)
                     # cv2.waitKey(0)
                     # cv2.destroyAllWindows()
-                    # plt.imshow(image)
-                    # plt.show()
-                    PIL.Image.fromarray(image).show()
+                    plt.imshow(image)
+                    plt.show()
+                    # PIL.Image.fromarray(image).show()
 
 
     def predict(self):

@@ -18,7 +18,7 @@ from glob import glob
 import re
 
 def glob_format(path,base_name = False):
-    print('--------pid:%d start--------------' % (os.getpid()))
+    #print('--------pid:%d start--------------' % (os.getpid()))
     fmt_list = ('.jpg', '.jpeg', '.png',".xml")
     fs = []
     if not os.path.exists(path):return fs
@@ -32,7 +32,7 @@ def glob_format(path,base_name = False):
                 continue
             if base_name:fs.append(file)  # fs.append(os.path.splitext(file)[0])
             else:fs.append(item)
-    print('--------pid:%d end--------------' % (os.getpid()))
+    #print('--------pid:%d end--------------' % (os.getpid()))
     return fs
 
 def load_classes(path):

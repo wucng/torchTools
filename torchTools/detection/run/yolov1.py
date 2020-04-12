@@ -1,9 +1,11 @@
 try:
-    from .network import net
-    from .loss import loss
-    from .datasets import datasets, bboxAug
-    from .visual import opencv
+    from ..network import net
+    from ..loss import loss
+    from ..datasets import datasets, bboxAug
+    from ..visual import opencv
 except:
+    import sys
+    sys.path.append("..")
     from network import net
     from loss import loss
     from datasets import datasets, bboxAug
@@ -235,7 +237,9 @@ def draw_rect(image,pred):
 
 if __name__=="__main__":
     classes=["__background__","person"]
-    testdataPath = "/kaggle/input/PennFudanPed/PNGImages/"
-    traindataPath = "/kaggle/input/"
+    # testdataPath = "/kaggle/input/PennFudanPed/PNGImages/"
+    testdataPath = "C:/Users/MI/Documents/GitHub/PennFudanPed/PNGImages/"
+    # traindataPath = "/kaggle/input/"
+    traindataPath = "C:/Users/MI/Documents/GitHub"
     model = YOLOV1(traindataPath,testdataPath,isTrain=True,num_anchors=2,num_classes=1,mulScale=True)
     model()

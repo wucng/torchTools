@@ -235,7 +235,7 @@ def draw_rect(image,pred):
 
 if __name__=="__main__":
     classes=["__background__","person"]
-    testdataPath = "/home/wucong/practise/datas/PennFudanPed/PNGImages/"
-    traindataPath = "/home/wucong/practise/datas/"
+    testdataPath = "/kaggle/input/PennFudanPed/PNGImages/"
+    traindataPath = "/kaggle/input/"
     model = YOLOV1(traindataPath,testdataPath,isTrain=True,num_anchors=2,num_classes=1,mulScale=True)
     model()

@@ -69,6 +69,9 @@ class Pad(object):
         return A_pad
 
 def imgaug_img(img):
+    # Sometimes(0.5, ...) applies the given augmenter in 50% of all cases,
+    # e.g. Sometimes(0.5, GaussianBlur(0.3)) would blur roughly every second
+    # image.
     sometimes = lambda aug: iaa.Sometimes(0.5, aug)
 
     # Define our sequence of augmentation steps that will be applied to every image.
@@ -172,7 +175,7 @@ def imgaug_img(img):
                                ),
                            ]),
 
-                           # Invert each image's chanell with 5% probability.
+                           # Invert each image's channel with 5% probability.
                            # This sets each pixel value v to 255-v.
                            iaa.Invert(0.05, per_channel=True),  # invert color channels
 
@@ -183,7 +186,7 @@ def imgaug_img(img):
                            iaa.Multiply((0.5, 1.5), per_channel=0.5),
 
                            # Improve or worsen the contrast of images.
-                           iaa.ContrastNormalization((0.5, 2.0), per_channel=0.5),
+                           iaa.LinearContrast((0.5, 2.0), per_channel=0.5),
 
                            # Convert each image to grayscale and then overlay the
                            # result with the original with random alpha. I.e. remove
@@ -206,8 +209,46 @@ def imgaug_img(img):
         # do all of the above augmentations in random order
         random_order=True
     )
+
     images_aug = seq.augment_images([img])
     return images_aug[0]
+
+
+def imgaug_img2(img):
+    seq = iaa.Sequential([
+        iaa.Fliplr(0.5),  # horizontal flips
+        iaa.Crop(percent=(0, 0.1)),  # random crops
+        # Small gaussian blur with random sigma between 0 and 0.5.
+        # But we only blur about 50% of all images.
+        iaa.Sometimes(
+            0.5,
+            iaa.GaussianBlur(sigma=(0, 0.5))
+        ),
+        # Strengthen or weaken the contrast in each image.
+        iaa.LinearContrast((0.75, 1.5)),
+        # Add gaussian noise.
+        # For 50% of all images, we sample the noise once per pixel.
+        # For the other 50% of all images, we sample the noise per pixel AND
+        # channel. This can change the color (not only brightness) of the
+        # pixels.
+        iaa.AdditiveGaussianNoise(loc=0, scale=(0.0, 0.05 * 255), per_channel=0.5),
+        # Make some images brighter and some darker.
+        # In 20% of all cases, we sample the multiplier once per channel,
+        # which can end up changing the color of the images.
+        iaa.Multiply((0.8, 1.2), per_channel=0.2),
+        # Apply affine transformations to each image.
+        # Scale/zoom them, translate/move them, rotate them and shear them.
+        iaa.Affine(
+            scale={"x": (0.8, 1.2), "y": (0.8, 1.2)},
+            translate_percent={"x": (-0.2, 0.2), "y": (-0.2, 0.2)},
+            rotate=(-25, 25),
+            shear=(-8, 8)
+        )
+    ], random_order=True)  # apply augmenters in random order
+
+    images_aug = seq.augment_images([img])
+    return images_aug[0]
+
 
 class Imgaug(object):
     def __init__(self):

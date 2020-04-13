@@ -171,17 +171,15 @@ class YOLOv1Loss(nn.Module):
             preds = preds.contiguous().view(-1, self.num_anchors, 5 + self.num_classes)
             # preds = preds.contiguous().view(bs,fh,fw,self.num_anchors,5 + self.num_classes)
             # 选择置信度最高的对应box(多个box时)
-            """
             new_preds = torch.zeros_like(preds)[:, 0, :]
             for i, p in enumerate(preds):
                 # conf
-                if p[0, 4] * p[0, 5] > p[1, 4] * p[1, 5]:
-                # if p[0, 4] > p[1, 4]:
+                # if p[0, 4] * p[0, 5] > p[1, 4] * p[1, 5]:
+                if p[0, 4] > p[1, 4]:
                     new_preds[i] = preds[i, 0, :]
                 else:
                     new_preds[i] = preds[i, 1, :]
-            """
-            new_preds = torch.max(preds, 1)[0]
+
 
             preds = new_preds.contiguous().view(bs, -1, 5 + self.num_classes)
 

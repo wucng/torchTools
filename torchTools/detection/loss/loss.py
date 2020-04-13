@@ -46,8 +46,13 @@ class YOLOv1Loss(nn.Module):
 
     def compute_loss(self,preds_list, targets_origin):
         """
-        :param preds: [n,7,7,12]
-        :param targets: [n,7,7,12]
+        :param preds:
+                if mulScale: # 使用多尺度（2个特征为例,batch=2）
+                    preds=[[(1,28,28,12),(1,14,14,12)],[(1,28,28,12),(1,14,14,12)]]
+                else: #（2个特征为例,batch=2）
+                   preds=[(2,28,28,12),(2,14,14,12)]
+        :param targets:
+                [{"boxes":(n,4),"labels":(n,)},{"boxes":(m,4),"labels":(m,)}]
         :return:
         """
         losses = {
@@ -164,6 +169,14 @@ class YOLOv1Loss(nn.Module):
         return result
 
     def predict(self, preds_list,targets_origin):
+        """
+        :param preds_list:
+                   #（2个特征为例,batch=2）
+                   preds_list=[(2,28,28,12),(2,14,14,12)]
+        :param targets_origin:
+                  [{"resize":(h,w),"origin_size":(h,w)},{"resize":(h,w),"origin_size":(h,w)}]
+        :return:
+        """
         result = []
 
         for idx, preds in enumerate(preds_list):

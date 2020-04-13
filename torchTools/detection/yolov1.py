@@ -1,11 +1,11 @@
 try:
-    from ..network import net
-    from ..loss import loss
-    from ..datasets import datasets, bboxAug
-    from ..visual import opencv
+    from .network import net
+    from .loss import loss
+    from .datasets import datasets, bboxAug
+    from .visual import opencv
 except:
     import sys
-    sys.path.append("..")
+    sys.path.append(".")
     from network import net
     from loss import loss
     from datasets import datasets, bboxAug
@@ -204,7 +204,7 @@ class YOLOV1(nn.Module):
         self.network.eval()
         with torch.no_grad():
             for idx, (data, target) in enumerate(self.test_loader):
-                if idx >2:break # ???????????????????????
+                if idx >3:break # ???????????????????????
                 data = torch.stack(data,0) # 做测试时不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
                 if self.use_cuda:
                     data = data.to(self.device)

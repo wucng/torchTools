@@ -70,7 +70,7 @@ class YOLOV1(nn.Module):
                           # ---------两者取其一--------------------
                           bboxAug.RandomHorizontalFlip(),
                           bboxAug.RandomTranslate(),
-                          bboxAug.RandomRotate(3),
+                          # bboxAug.RandomRotate(3),
                           bboxAug.RandomBrightness(),
                           bboxAug.RandomSaturation(),
                           bboxAug.RandomHue(),

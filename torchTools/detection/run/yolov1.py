@@ -63,20 +63,22 @@ class YOLOV1(nn.Module):
             train_dataset = datasets.PennFudanDataset(trainDP,
                       transforms=bboxAug.Compose([
                           bboxAug.RandomChoice(),
-                          *random.choice([
-                              [bboxAug.Pad(), bboxAug.Resize(resize, mulScale)],
-                              [bboxAug.Resize2(resize, mulScale)]
-                          ]),
-                          # ---------两者取其一--------------------
-                          bboxAug.RandomHorizontalFlip(),
-                          bboxAug.RandomTranslate(),
-                          # bboxAug.RandomRotate(3),
-                          bboxAug.RandomBrightness(),
-                          bboxAug.RandomSaturation(),
-                          bboxAug.RandomHue(),
-                          bboxAug.RandomBlur(),
+                          bboxAug.Pad(), bboxAug.Resize(resize, mulScale),
+                          # *random.choice([
+                          #     [bboxAug.Pad(), bboxAug.Resize(resize, mulScale)],
+                          #     [bboxAug.Resize2(resize, mulScale)]
+                          # ]),
 
-                          # bboxAug.Augment(advanced),
+                          # ---------两者取其一--------------------
+                          # bboxAug.RandomHorizontalFlip(),
+                          # bboxAug.RandomTranslate(),
+                          # # bboxAug.RandomRotate(3),
+                          # bboxAug.RandomBrightness(),
+                          # bboxAug.RandomSaturation(),
+                          # bboxAug.RandomHue(),
+                          # bboxAug.RandomBlur(),
+
+                          bboxAug.Augment(advanced),
                           # -------------------------------
 
                           bboxAug.ToTensor(),  # PIL --> tensor
@@ -145,7 +147,7 @@ class YOLOV1(nn.Module):
         if self.isTrain:
             for epoch in range(self.epochs):
                 self.train(epoch)
-                self.test()
+                # self.test()
                 # update the learning rate
                 self.lr_scheduler.step()
                 torch.save(self.network.state_dict(), self.save_model)
@@ -202,7 +204,7 @@ class YOLOV1(nn.Module):
         self.network.eval()
         with torch.no_grad():
             for idx, (data, target) in enumerate(self.test_loader):
-                if idx >2:break # ???????????????????????
+                # if idx >2:break # ???????????????????????
                 data = torch.stack(data,0) # 做测试时不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
                 if self.use_cuda:
                     data = data.to(self.device)

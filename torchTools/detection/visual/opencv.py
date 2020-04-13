@@ -50,7 +50,7 @@ def vis_rect(img, pos,class_str="person",font_scale=0.35,label=1,colors=[],insid
         mask[c1[1]:c2[1],c1[0]:c2[0]]=1
         # color_mask = [255, 184,99]  # BGR
         color_mask = np.asarray(color, np.uint8).reshape([1, 3])
-        img = vis_mask(img, mask, color_mask, 0.3, False)
+        img = vis_mask(img, mask, color_mask, 0.3, True)
 
     if inside:
         # 文字在框内

@@ -35,7 +35,7 @@ def collate_fn(batch_data):
 
 class YOLOV1(nn.Module):
     def __init__(self,trainDP=None,testDP=None,model_name="resnet18",num_features=None,
-                 pretrained=False,droprate=0.5, usize=256,isTrain=False,
+                 pretrained=False,dropRate=0.5, usize=256,isTrain=False,
                  basePath="./",save_model = "model.pt",summaryPath="yolov1_resnet50_416",
                  epochs = 100,print_freq=1,resize:tuple = (224,224),
                  mulScale=False,advanced=False,batch_size=2,num_anchors=2,lr=2e-4,
@@ -114,8 +114,11 @@ class YOLOV1(nn.Module):
 
         self.loss_func = loss.YOLOv1Loss(self.device,num_anchors,num_classes,threshold_conf,
                                          threshold_cls,conf_thres,nms_thres,filter_labels,self.mulScale)
-        self.network = net.YOLOV1Net(num_classes,num_anchors,model_name,num_features,pretrained,droprate,usize)
+        self.network = net.YOLOV1Net(num_classes,num_anchors,model_name,num_features,pretrained,dropRate,usize)
         # self.network.apply(net.weights_init)
+        self.network.fpn.apply(net.weights_init) # backbone 不使用
+        self.network.net.apply(net.weights_init)
+
         if self.use_cuda:
             self.network.to(self.device)
 
@@ -138,8 +141,8 @@ class YOLOV1(nn.Module):
             {"params": self.network.backbone.parameters(), "lr": lr / 5},  # 1e-4
         ]
 
-        self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr, weight_decay=4e-05)
-        # self.optimizer = torch.optim.Adam(params, weight_decay=4e-05)
+        # self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr, weight_decay=4e-05)
+        self.optimizer = torch.optim.Adam(params, weight_decay=4e-05)
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1)
 
         self.writer = SummaryWriter(os.path.join(basePath,summaryPath))
@@ -148,8 +151,8 @@ class YOLOV1(nn.Module):
         if self.isTrain:
             for epoch in range(self.epochs):
                 self.train(epoch)
-                # if epoch > 0 and epoch % 30 == 0:
-                #     self.test(3)
+                if epoch>0 and epoch%30==0:
+                    self.test(3)
                 # update the learning rate
                 self.lr_scheduler.step()
                 torch.save(self.network.state_dict(), self.save_model)
@@ -206,7 +209,7 @@ class YOLOV1(nn.Module):
         with torch.no_grad():
             for idx, (data, target) in enumerate(self.test_loader):
                 if nums is not None:
-                    if idx > nums: break
+                    if idx > nums:break
                 data = torch.stack(data,0) # 做测试时不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
                 if self.use_cuda:
                     data = data.to(self.device)
@@ -253,13 +256,19 @@ def draw_rect(image,pred,classes):
 
 if __name__=="__main__":
     classes = ["__background__", "person"]
-    testdataPath = "C:/Users/MI/Documents/GitHub/PennFudanPed/PNGImages/"
+    testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
     # testdataPath = "/home/wucong/practise/datas/PennFudanPed/PNGImages/"
-    traindataPath = "C:/Users/MI/Documents/GitHub/PennFudanPed/"
+    traindataPath = "D:/practice/datas/PennFudanPed/"
     # traindataPath = "/home/wucong/practise/datas/PennFudanPed/"
     basePath = "./models/"
-    model = YOLOV1(traindataPath, testdataPath, "resnet50", pretrained=True, num_features=1,
-                   isTrain=True, num_anchors=2, num_classes=1, mulScale=False, epochs=400, print_freq=40,
-                   basePath=basePath, threshold_conf=0.2, threshold_cls=0.5, lr=3e-3, batch_size=2,
-                   conf_thres=0.5, nms_thres=0.4, classes=classes)
+    # model = YOLOV1(traindataPath, testdataPath, "resnet18", pretrained=True, num_features=1,
+    #                isTrain=False, num_anchors=2, num_classes=1, mulScale=False, epochs=400, print_freq=40,
+    #                basePath=basePath, threshold_conf=0.6, threshold_cls=0.6, lr=3e-3, batch_size=2,
+    #                conf_thres=0.7, nms_thres=0.4, classes=classes)
+
+    model = YOLOV1(traindataPath, testdataPath, "resnet18", pretrained=True, num_features=2,
+                   isTrain=False, num_anchors=2, num_classes=1, mulScale=False, epochs=400, print_freq=40,
+                   basePath=basePath, threshold_conf=0.6, threshold_cls=0.6, lr=3e-3, batch_size=2,
+                   conf_thres=0.7, nms_thres=0.4, classes=classes)
+
     model()

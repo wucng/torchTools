@@ -35,7 +35,7 @@ def collate_fn(batch_data):
 
 class YOLOV1(nn.Module):
     def __init__(self,trainDP=None,testDP=None,model_name="resnet18",num_features=None,
-                 pretrained=False,droprate=0.5, usize=256,isTrain=False,
+                 pretrained=False,dropRate=0.5, usize=256,isTrain=False,
                  basePath="./",save_model = "model.pt",summaryPath="yolov1_resnet50_416",
                  epochs = 100,print_freq=1,resize:tuple = (224,224),
                  mulScale=False,advanced=False,batch_size=2,num_anchors=2,lr=2e-4,
@@ -114,8 +114,11 @@ class YOLOV1(nn.Module):
 
         self.loss_func = loss.YOLOv1Loss(self.device,num_anchors,num_classes,threshold_conf,
                                          threshold_cls,conf_thres,nms_thres,filter_labels,self.mulScale)
-        self.network = net.YOLOV1Net(num_classes,num_anchors,model_name,num_features,pretrained,droprate,usize)
-        self.network.apply(net.weights_init)
+        self.network = net.YOLOV1Net(num_classes,num_anchors,model_name,num_features,pretrained,dropRate,usize)
+        # self.network.apply(net.weights_init)
+        self.network.fpn.apply(net.weights_init) # backbone 不使用
+        self.network.net.apply(net.weights_init)
+
         if self.use_cuda:
             self.network.to(self.device)
 

@@ -30,9 +30,10 @@ def weights_init(m):
 
 # model resnet
 class BackBoneNet(nn.Module):
-    def __init__(self,model_name="resnet101", pretrained=False):
+    def __init__(self,model_name="resnet101", pretrained=False,dropRate=0.5):
         super(BackBoneNet, self).__init__()
         self.pretrained = pretrained
+        self.dropRate = dropRate
 
         model_dict ={'resnet18':512,
                      'resnet34':512,
@@ -71,7 +72,9 @@ class BackBoneNet(nn.Module):
         out = []
         for i,net in enumerate(self.backbone):
             x = net(x)
-            if i>0:out.append(x)
+            if i>0:
+                x = F.dropout(x,self.dropRate)
+                out.append(x)
         return out
 
 class FPNNet(nn.Module):
@@ -84,13 +87,15 @@ class FPNNet(nn.Module):
             m = nn.Sequential(
                 nn.Conv2d(backbone_size//2**i, usize, 1),
                 nn.BatchNorm2d(usize),
-                nn.ReLU()
+                # nn.ReLU()
+                nn.LeakyReLU(0.2)
             )
 
             p = nn.Sequential(
                 nn.Conv2d(usize, usize, 3, stride=1, padding=1),
                 nn.BatchNorm2d(usize),
-                nn.ReLU()
+                # nn.ReLU()
+                nn.LeakyReLU(0.2)
             )
 
             upsample = nn.Sequential(
@@ -139,25 +144,29 @@ class XNet(nn.Module):
             downsample_w1 = nn.Sequential(
                 nn.Conv2d(usize,usize,3,(1,2),1),
                 nn.BatchNorm2d(usize),
-                nn.ReLU()
+                # nn.ReLU()
+                nn.LeakyReLU(0.2)
             )
 
             downsample_w2 = nn.Sequential(
                 nn.Conv2d(usize, usize, 3, (1, 2), 1),
                 nn.BatchNorm2d(usize),
-                nn.ReLU()
+                # nn.ReLU()
+                nn.LeakyReLU(0.2)
             )
 
             downsample_h1 = nn.Sequential(
                 nn.Conv2d(usize, usize, 3, (2, 1), 1),
                 nn.BatchNorm2d(usize),
-                nn.ReLU()
+                # nn.ReLU()
+                nn.LeakyReLU(0.2)
             )
 
             downsample_h2 = nn.Sequential(
                 nn.Conv2d(usize, usize, 3, (2, 1), 1),
                 nn.BatchNorm2d(usize),
-                nn.ReLU()
+                # nn.ReLU()
+                nn.LeakyReLU(0.2)
             )
 
             tmp = nn.ModuleList()
@@ -189,9 +198,9 @@ class XNet(nn.Module):
 
 class YOLOV1Net(nn.Module):
     def __init__(self, num_classes=1, num_anchors=2, model_name="resnet101",num_features=None,
-                pretrained=False, droprate=0.5, usize=256):
+                pretrained=False, dropRate=0.5, usize=256):
         super(YOLOV1Net, self).__init__()
-        self.backbone = BackBoneNet(model_name,pretrained)
+        self.backbone = BackBoneNet(model_name,pretrained,dropRate)
         self.num_features = self.backbone.num_features if num_features is None else num_features
         self.fpn = FPNNet(self.backbone.backbone_size,self.num_features,usize)
         # self.fpn = XNet(self.backbone.backbone_size,self.num_features,usize)
@@ -200,14 +209,14 @@ class YOLOV1Net(nn.Module):
         self.net = nn.ModuleList()
         for i in range(self.num_features):
             convp = nn.Sequential(
-                nn.Dropout(droprate),
+                nn.Dropout(dropRate),
                 # nn.Conv2d(usize, usize, kernel_size=3, stride=1, padding=1),
                 # nn.BatchNorm2d(usize),
                 # nn.LeakyReLU(),
                 nn.Conv2d(usize, num_anchors * (5 + num_classes), kernel_size=3, stride=1, padding=1),
                 # 每个box对应一个类别
                 # 每个anchor对应4个坐标
-                nn.BatchNorm2d(num_anchors * (5 + num_classes)),
+                # nn.BatchNorm2d(num_anchors * (5 + num_classes)),
                 nn.Sigmoid()
             )
 

@@ -85,38 +85,38 @@ class YOLOv1Loss(nn.Module):
                 targ_obj = targets[index]
 
                 loss_conf = F.binary_cross_entropy(has_obj[..., 4], torch.ones_like(has_obj[..., 4]).detach(),
-                                                   reduction="sum")  # 对应目标
+                                                   reduction="mean")  # 对应目标
                 loss_conf += F.binary_cross_entropy(has_obj[..., 4 + 5 + self.num_classes],
-                                                    torch.ones_like(has_obj[..., 4]).detach(), reduction="sum")  # 对应目标
+                                                    torch.ones_like(has_obj[..., 4]).detach(), reduction="mean")  # 对应目标
 
 
                 loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
-                                                      reduction="sum")  # 对应背景
+                                                      reduction="mean")  # 对应背景
                 loss_no_conf += F.binary_cross_entropy(no_obj[..., 4 + 5 + self.num_classes],
-                                                       torch.zeros_like(no_obj[..., 4]).detach(), reduction="sum")  # 对应背景
+                                                       torch.zeros_like(no_obj[..., 4]).detach(), reduction="mean")  # 对应背景
 
                 # boxes loss
                 # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
                 # loss_box += F.mse_loss(has_obj[...,5+self.num_classes:4+5+self.num_classes],targ_obj[...,:4].detach(),reduction="sum")
 
-                loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
+                loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="mean")
                 loss_box += F.smooth_l1_loss(has_obj[..., 5 + self.num_classes:4 + 5 + self.num_classes],
-                                             targ_obj[..., 5 + self.num_classes:4 + 5 + self.num_classes].detach(), reduction="sum")
+                                             targ_obj[..., 5 + self.num_classes:4 + 5 + self.num_classes].detach(), reduction="mean")
 
                 # classify loss
-                loss_clf = F.binary_cross_entropy(has_obj[..., 5], targ_obj[..., 5].detach(), reduction="sum")
+                loss_clf = F.binary_cross_entropy(has_obj[..., 5], targ_obj[..., 5].detach(), reduction="mean")
                 loss_clf += F.binary_cross_entropy(has_obj[..., 5 + 5 + self.num_classes], targ_obj[..., 5].detach(),
-                                                   reduction="sum")
+                                                   reduction="mean")
 
-                loss_no_clf = F.binary_cross_entropy(no_obj[..., 5], torch.zeros_like(no_obj[..., 5]).detach(), reduction="sum")
+                loss_no_clf = F.binary_cross_entropy(no_obj[..., 5], torch.zeros_like(no_obj[..., 5]).detach(), reduction="mean")
                 loss_no_clf += F.binary_cross_entropy(no_obj[..., 5 + 5 + self.num_classes],
-                                                      torch.zeros_like(no_obj[..., 5]).detach(), reduction="sum")
+                                                      torch.zeros_like(no_obj[..., 5]).detach(), reduction="mean")
 
-                losses["loss_conf"] += loss_conf
-                losses["loss_no_conf"] += loss_no_conf * 0.1  # 0.05
-                losses["loss_box"] += loss_box * 5  # 50
-                losses["loss_clf"] += loss_clf
-                losses["loss_no_clf"] += loss_no_clf * 0.1  # 0.05
+                losses["loss_conf"] += loss_conf*5
+                losses["loss_no_conf"] += loss_no_conf * 0.05  # 0.05
+                losses["loss_box"] += loss_box * 50  # 50
+                losses["loss_clf"] += loss_clf*2
+                losses["loss_no_clf"] += loss_no_clf * 0.05  # 0.05
 
         return losses
 
@@ -187,8 +187,8 @@ class YOLOv1Loss(nn.Module):
             new_preds = torch.zeros_like(preds)[:, 0, :]
             for i, p in enumerate(preds):
                 # conf
-                # if p[0, 4] * p[0, 5] > p[1, 4] * p[1, 5]:
-                if p[0, 4] > p[1, 4]:
+                if p[0, 4] * p[0, 5] > p[1, 4] * p[1, 5]:
+                # if p[0, 4] > p[1, 4]:
                     new_preds[i] = preds[i, 0, :]
                 else:
                     new_preds[i] = preds[i, 1, :]
@@ -327,6 +327,8 @@ class YOLOv1Loss(nn.Module):
             # resize 到原图上
             h_ori,w_ori = prediction["original_size"]
             h_re,w_re = prediction["resize"]
+            h_ori = h_ori.float()
+            w_ori = w_ori.float()
 
             # to pad图上
             if h_ori > w_ori:

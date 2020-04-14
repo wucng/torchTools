@@ -148,7 +148,8 @@ class YOLOV1(nn.Module):
         if self.isTrain:
             for epoch in range(self.epochs):
                 self.train(epoch)
-                self.test()
+                if epoch>0 and epoch%30==0:
+                    self.test(3)
                 # update the learning rate
                 self.lr_scheduler.step()
                 torch.save(self.network.state_dict(), self.save_model)
@@ -200,11 +201,12 @@ class YOLOV1(nn.Module):
 
                 print(ss)
 
-    def test(self):
+    def test(self,nums=None):
         self.network.eval()
         with torch.no_grad():
             for idx, (data, target) in enumerate(self.test_loader):
-                if idx >2:break # ???????????????????????
+                if nums is not None:
+                    if idx > nums:break
                 data = torch.stack(data,0) # 做测试时不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
                 if self.use_cuda:
                     data = data.to(self.device)

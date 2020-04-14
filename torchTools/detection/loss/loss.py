@@ -85,37 +85,37 @@ class YOLOv1Loss(nn.Module):
                 targ_obj = targets[index]
 
                 loss_conf = F.binary_cross_entropy(has_obj[..., 4], torch.ones_like(has_obj[..., 4]).detach(),
-                                                   reduction="mean")  # 对应目标
+                                                   reduction="sum")  # 对应目标
                 loss_conf += F.binary_cross_entropy(has_obj[..., 4 + 5 + self.num_classes],
-                                                    torch.ones_like(has_obj[..., 4]).detach(), reduction="mean")  # 对应目标
+                                                    torch.ones_like(has_obj[..., 4]).detach(), reduction="sum")  # 对应目标
 
 
                 loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
-                                                      reduction="mean")  # 对应背景
+                                                      reduction="sum")  # 对应背景
                 loss_no_conf += F.binary_cross_entropy(no_obj[..., 4 + 5 + self.num_classes],
-                                                       torch.zeros_like(no_obj[..., 4]).detach(), reduction="mean")  # 对应背景
+                                                       torch.zeros_like(no_obj[..., 4]).detach(), reduction="sum")  # 对应背景
 
                 # boxes loss
                 # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
                 # loss_box += F.mse_loss(has_obj[...,5+self.num_classes:4+5+self.num_classes],targ_obj[...,:4].detach(),reduction="sum")
 
-                loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="mean")
+                loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
                 loss_box += F.smooth_l1_loss(has_obj[..., 5 + self.num_classes:4 + 5 + self.num_classes],
-                                             targ_obj[..., 5 + self.num_classes:4 + 5 + self.num_classes].detach(), reduction="mean")
+                                             targ_obj[..., 5 + self.num_classes:4 + 5 + self.num_classes].detach(), reduction="sum")
 
                 # classify loss
-                loss_clf = F.binary_cross_entropy(has_obj[..., 5], targ_obj[..., 5].detach(), reduction="mean")
+                loss_clf = F.binary_cross_entropy(has_obj[..., 5], targ_obj[..., 5].detach(), reduction="sum")
                 loss_clf += F.binary_cross_entropy(has_obj[..., 5 + 5 + self.num_classes], targ_obj[..., 5].detach(),
-                                                   reduction="mean")
+                                                   reduction="sum")
 
-                loss_no_clf = F.binary_cross_entropy(no_obj[..., 5], torch.zeros_like(no_obj[..., 5]).detach(), reduction="mean")
+                loss_no_clf = F.binary_cross_entropy(no_obj[..., 5], torch.zeros_like(no_obj[..., 5]).detach(), reduction="sum")
                 loss_no_clf += F.binary_cross_entropy(no_obj[..., 5 + 5 + self.num_classes],
-                                                      torch.zeros_like(no_obj[..., 5]).detach(), reduction="mean")
+                                                      torch.zeros_like(no_obj[..., 5]).detach(), reduction="sum")
 
-                losses["loss_conf"] += loss_conf*5
+                losses["loss_conf"] += loss_conf
                 losses["loss_no_conf"] += loss_no_conf * 0.05  # 0.05
-                losses["loss_box"] += loss_box * 50  # 50
-                losses["loss_clf"] += loss_clf*2
+                losses["loss_box"] += loss_box * 50.  # 50
+                losses["loss_clf"] += loss_clf
                 losses["loss_no_clf"] += loss_no_clf * 0.05  # 0.05
 
         return losses

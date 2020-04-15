@@ -205,6 +205,8 @@ class YOLOV1Net(nn.Module):
         self.fpn = FPNNet(self.backbone.backbone_size,self.num_features,usize)
         # self.fpn = XNet(self.backbone.backbone_size,self.num_features,usize)
         self.num_features = self.fpn.num_features
+        self.num_classes = num_classes
+        self.num_anchors = num_anchors
 
         self.net = nn.ModuleList()
         for i in range(self.num_features):
@@ -217,7 +219,7 @@ class YOLOV1Net(nn.Module):
                 # 每个box对应一个类别
                 # 每个anchor对应4个坐标
                 # nn.BatchNorm2d(num_anchors * (5 + num_classes)),
-                nn.Sigmoid()
+                # nn.Sigmoid()
             )
 
             self.net.append(convp)
@@ -229,15 +231,22 @@ class YOLOV1Net(nn.Module):
         for i in range(self.num_features):
             p = self.net[i](p_x[i])
             p = p.permute(0, 2, 3, 1)  # (-1,7,7,30)
+            # """
+            bs,fh,fw,c=p.shape
+            p = p.contiguous().view(bs,fh,fw,self.num_anchors,5 + self.num_classes)
+            p[...,:5] = torch.sigmoid(p[...,:5])
+            p = p.contiguous().view(bs,fh,fw,self.num_anchors*(5 + self.num_classes))
+            # """
+
             out.append(p)
 
         return out # p1,p2,p3,p4
 
 
 
-if __name__=="__main__":
-    x = torch.rand([1,3,224,224])
-    network = YOLOV1Net(model_name="resnet18",num_features=None)
-    network.apply(weights_init)
-    p = network(x)
-    print(p.shape)
+
+if __name__ == "__main__":
+    net = YOLOV1Net(model_name="resnet50", usize=256,num_features=1)
+    # x = torch.rand([5,3,224,224])
+    # print(net(x).shape)
+    torch.save(net.state_dict(), "./model.pt")

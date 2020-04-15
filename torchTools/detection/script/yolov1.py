@@ -1,15 +1,17 @@
 try:
-    from .network import net
-    from .loss import loss
-    from .datasets import datasets, bboxAug
-    from .visual import opencv
+    from ..network import net
+    from ..loss import loss
+    from ..datasets import datasets, bboxAug
+    from ..visual import opencv
+    from ..optm import optimizer
 except:
     import sys
-    sys.path.append(".")
+    sys.path.append("..")
     from network import net
     from loss import loss
     from datasets import datasets, bboxAug
     from visual import opencv
+    from optm import optimizer
 
 from torch import nn
 import torch
@@ -39,7 +41,8 @@ class YOLOV1(nn.Module):
                  basePath="./",save_model = "model.pt",summaryPath="yolov1_resnet50_416",
                  epochs = 100,print_freq=1,resize:tuple = (224,224),
                  mulScale=False,advanced=False,batch_size=2,num_anchors=2,lr=2e-4,
-                 num_classes=20,
+                 # num_classes=20,
+                 typeOfData="PennFudanDataset",
                  threshold_conf=0.5,threshold_cls=0.5, #  # 0.05,0.5
                  conf_thres=0.5,nms_thres=0.4, # 0.8,0.4
                  filter_labels = [],classes=[]):
@@ -51,6 +54,7 @@ class YOLOV1(nn.Module):
         self.isTrain = isTrain
         self.mulScale = mulScale
         self.classes = classes
+        num_classes = len(self.classes)
 
         # seed = 100
         seed = int(time.time() * 1000)
@@ -60,7 +64,13 @@ class YOLOV1(nn.Module):
         kwargs = {'num_workers': 5, 'pin_memory': True} if self.use_cuda else {}
 
         if self.isTrain:
-            train_dataset = datasets.PennFudanDataset(trainDP,
+            if typeOfData=="PennFudanDataset":
+                Data = datasets.PennFudanDataset
+            elif typeOfData=="PascalVOCDataset":
+                Data = datasets.PascalVOCDataset
+            else:
+                pass
+            train_dataset = Data(trainDP,
                       transforms=bboxAug.Compose([
                           # bboxAug.RandomChoice(),
                           bboxAug.Pad(), bboxAug.Resize(resize, mulScale),
@@ -83,7 +93,7 @@ class YOLOV1(nn.Module):
 
                           bboxAug.ToTensor(),  # PIL --> tensor
                           bboxAug.Normalize() # tensor --> tensor
-                      ]))
+                      ]),classes=classes)
 
             test_dataset = datasets.ValidDataset(testDP,
                                             transforms=bboxAug.Compose([
@@ -138,11 +148,13 @@ class YOLOV1(nn.Module):
 
         params = [
             {"params": logits_params, "lr": lr},  # 1e-3
-            {"params": self.network.backbone.parameters(), "lr": lr / 5},  # 1e-4
+            {"params": self.network.backbone.parameters(), "lr": lr / 3},  # 1e-4
         ]
 
         # self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr, weight_decay=4e-05)
-        self.optimizer = torch.optim.Adam(params, weight_decay=4e-05)
+        # self.optimizer = torch.optim.Adam(params, weight_decay=4e-05)
+        self.optimizer = optimizer.RAdam(params, weight_decay=4e-05)
+
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1)
 
         self.writer = SummaryWriter(os.path.join(basePath,summaryPath))
@@ -151,8 +163,8 @@ class YOLOV1(nn.Module):
         if self.isTrain:
             for epoch in range(self.epochs):
                 self.train(epoch)
-                if epoch>0 and epoch%30==0:
-                    self.test(3)
+                # if epoch>0 and epoch%30==0:
+                #     self.test(3)
                 # update the learning rate
                 self.lr_scheduler.step()
                 torch.save(self.network.state_dict(), self.save_model)
@@ -167,6 +179,8 @@ class YOLOV1(nn.Module):
         self.network.train()
         num_trains = len(self.train_loader.dataset)
         for idx, (data, target) in enumerate(self.train_loader):
+            if not self.mulScale:
+                data = torch.stack(data, 0)  # 不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
             if self.use_cuda:
                 # data, target = data.to(self.device), target.to(self.device)
                 # data = data.to(self.device)
@@ -174,7 +188,6 @@ class YOLOV1(nn.Module):
                 if self.mulScale:
                     data = [d.to(self.device) for d in data]
                 else:
-                    data = torch.stack(data, 0)  # 不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
                     data = data.to(self.device)
                 target = [{k: v.to(self.device) for k, v in targ.items()} for targ in target]
 
@@ -215,6 +228,8 @@ class YOLOV1(nn.Module):
                     data = data.to(self.device)
                     # data = [d.to(self.device) for d in data]
                     new_target = [{k: v.to(self.device) for k, v in targ.items() if k!="path"} for targ in target]
+                else:
+                    new_target = target
 
                 output = self.network(data)
                 preds = self.loss_func(output,new_target)
@@ -225,50 +240,58 @@ class YOLOV1(nn.Module):
                     path = target[i]["path"]
                     image = np.asarray(PIL.Image.open(path).convert("RGB"), np.uint8)
                     # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-                    image = draw_rect(image,pred,self.classes)
+                    image = self.draw_rect(image,pred)
 
                     # cv2.imshow("test", image)
                     # cv2.waitKey(0)
                     # cv2.destroyAllWindows()
-                    plt.imshow(image)
-                    plt.show()
+                    # plt.imshow(image)
+                    # plt.show()
                     # PIL.Image.fromarray(image).show()
+
+                    # save
+                    newPath = path.replace("PNGImages", "result")
+                    if not os.path.exists(os.path.dirname(newPath)): os.makedirs(os.path.dirname(newPath))
+                    cv2.imwrite(newPath, image)
+
 
 
     def predict(self):
         pass
 
-def draw_rect(image,pred,classes):
-    labels = pred["labels"]
-    bboxs = pred["boxes"]
-    scores = pred["scores"]
+    def draw_rect(self,image,pred):
+        labels = pred["labels"]
+        bboxs = pred["boxes"]
+        scores = pred["scores"]
 
-    for label,bbox,score in zip(labels,bboxs,scores):
-        label=label.cpu().numpy()
-        bbox=bbox.cpu().numpy()#.astype(np.int16)
-        score=score.cpu().numpy()
-        class_str="%s:%.3f"%(classes[int(label)],score) # 跳过背景
-        pos = list(map(int, bbox))
+        for label,bbox,score in zip(labels,bboxs,scores):
+            label=label.cpu().numpy()
+            bbox=bbox.cpu().numpy()#.astype(np.int16)
+            score=score.cpu().numpy()
+            class_str="%s:%.3f"%(self.classes[int(label)],score) # 跳过背景
+            pos = list(map(int, bbox))
 
-        image=opencv.vis_rect(image,pos,class_str,0.5,int(label))
-    return image
+            image=opencv.vis_rect(image,pos,class_str,0.5,int(label))
+        return image
 
 
 if __name__=="__main__":
-    classes = ["__background__", "person"]
-    testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
-    # testdataPath = "/home/wucong/practise/datas/PennFudanPed/PNGImages/"
-    traindataPath = "D:/practice/datas/PennFudanPed/"
-    # traindataPath = "/home/wucong/practise/datas/PennFudanPed/"
-    basePath = "./models/"
-    # model = YOLOV1(traindataPath, testdataPath, "resnet18", pretrained=True, num_features=1,
-    #                isTrain=False, num_anchors=2, num_classes=1, mulScale=False, epochs=400, print_freq=40,
-    #                basePath=basePath, threshold_conf=0.6, threshold_cls=0.6, lr=3e-3, batch_size=2,
-    #                conf_thres=0.7, nms_thres=0.4, classes=classes)
+    """
+    classes = ["person"]
+    testdataPath = "/home/wucong/practise/datas/valid/PNGImages/"
+    traindataPath = "/home/wucong/practise/datas/PennFudanPed/"
+    typeOfData = "PennFudanDataset"
+    """
+    classes = ["bicycle", "bus", "car", "motorbike", "person"]
+    testdataPath = "/home/wucong/practise/datas/valid/PNGImages/"
+    traindataPath = "/home/wucong/practise/datas/VOCdevkit/"
+    typeOfData = "PascalVOCDataset"
+    # """
 
-    model = YOLOV1(traindataPath, testdataPath, "resnet18", pretrained=True, num_features=2,
-                   isTrain=False, num_anchors=2, num_classes=1, mulScale=False, epochs=400, print_freq=40,
-                   basePath=basePath, threshold_conf=0.6, threshold_cls=0.6, lr=3e-3, batch_size=2,
-                   conf_thres=0.7, nms_thres=0.4, classes=classes)
+    basePath = "./models/"
+    model = YOLOV1(traindataPath, testdataPath, "resnet50", pretrained=True, num_features=1,resize=(416,416),
+                   isTrain=True, num_anchors=2, mulScale=False, epochs=400, print_freq=40,
+                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=3e-3, batch_size=4,
+                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=1024)
 
     model()

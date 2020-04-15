@@ -1,6 +1,9 @@
-import imgaug as ia
-import imgaug.augmenters as iaa
-from imgaug.augmentables.bbs import BoundingBox, BoundingBoxesOnImage
+try:
+    import imgaug as ia
+    import imgaug.augmenters as iaa
+    from imgaug.augmentables.bbs import BoundingBox, BoundingBoxesOnImage
+except:
+    pass
 import cv2
 import numpy as np
 import random

@@ -3,6 +3,7 @@ try:
     from ..loss import loss
     from ..datasets import datasets, bboxAug
     from ..visual import opencv
+    from ..optm import optimizer
 except:
     import sys
     sys.path.append("..")
@@ -10,6 +11,7 @@ except:
     from loss import loss
     from datasets import datasets, bboxAug
     from visual import opencv
+    from optm import optimizer
 
 from torch import nn
 import torch
@@ -34,14 +36,13 @@ def collate_fn(batch_data):
     return data_list,target_list
 
 class YOLOV1(nn.Module):
-    def __init__(self,trainDP=None,testDP=None,model_name="resnet18",num_features=None,
+    def __init__(self,train_dataset=None,test_dataset=None,model_name="resnet18",num_features=None,
                  pretrained=False,dropRate=0.5, usize=256,isTrain=False,
                  basePath="./",save_model = "model.pt",summaryPath="yolov1_resnet50_416",
-                 epochs = 100,print_freq=1,resize:tuple = (224,224),
-                 mulScale=False,advanced=False,batch_size=2,num_anchors=2,lr=2e-4,
-                 num_classes=20,
+                 epochs = 100,print_freq=50,
+                 batch_size=2,num_anchors=2,lr=3e-3,
                  threshold_conf=0.5,threshold_cls=0.5, #  # 0.05,0.5
-                 conf_thres=0.5,nms_thres=0.4, # 0.8,0.4
+                 conf_thres=0.7,nms_thres=0.4, # 0.8,0.4
                  filter_labels = [],classes=[]):
         super(YOLOV1,self).__init__()
 
@@ -51,6 +52,7 @@ class YOLOV1(nn.Module):
         self.isTrain = isTrain
         self.mulScale = mulScale
         self.classes = classes
+        num_classes = len(self.classes)
 
         # seed = 100
         seed = int(time.time() * 1000)
@@ -59,58 +61,13 @@ class YOLOV1(nn.Module):
         torch.manual_seed(seed)
         kwargs = {'num_workers': 5, 'pin_memory': True} if self.use_cuda else {}
 
-        if self.isTrain:
-            train_dataset = datasets.PennFudanDataset(trainDP,
-                      transforms=bboxAug.Compose([
-                          bboxAug.RandomChoice(),
-                          bboxAug.Pad(), bboxAug.Resize(resize, mulScale),
-                          # *random.choice([
-                          #     [bboxAug.Pad(), bboxAug.Resize(resize, mulScale)],
-                          #     [bboxAug.Resize2(resize, mulScale)]
-                          # ]),
 
-                          # ---------两者取其一--------------------
-                          # bboxAug.RandomHorizontalFlip(),
-                          # bboxAug.RandomTranslate(),
-                          # # bboxAug.RandomRotate(3),
-                          # bboxAug.RandomBrightness(),
-                          # bboxAug.RandomSaturation(),
-                          # bboxAug.RandomHue(),
-                          # bboxAug.RandomBlur(),
-
-                          bboxAug.Augment(advanced),
-                          # -------------------------------
-
-                          bboxAug.ToTensor(),  # PIL --> tensor
-                          bboxAug.Normalize() # tensor --> tensor
-                      ]))
-
-            test_dataset = datasets.ValidDataset(testDP,
-                                            transforms=bboxAug.Compose([
-                                                bboxAug.Pad(), bboxAug.Resize(resize, False),
-                                                bboxAug.ToTensor(),  # PIL --> tensor
-                                                bboxAug.Normalize()  # tensor --> tensor
-                                            ]))
-
+        if train_dataset is not None:
             self.train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
-                                          collate_fn=collate_fn, **kwargs)
-
+                                           collate_fn=collate_fn, **kwargs)
+        if test_dataset is not None:
             self.test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
                                           collate_fn=collate_fn, **kwargs)
-
-
-        else:
-            test_dataset = datasets.ValidDataset(testDP,
-                      transforms=bboxAug.Compose([
-                          bboxAug.Pad(), bboxAug.Resize(resize, False),
-                          bboxAug.ToTensor(),  # PIL --> tensor
-                          bboxAug.Normalize() # tensor --> tensor
-                      ]))
-
-            self.test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
-                                          collate_fn=collate_fn, **kwargs)
-
-
 
         self.loss_func = loss.YOLOv1Loss(self.device,num_anchors,num_classes,threshold_conf,
                                          threshold_cls,conf_thres,nms_thres,filter_labels,self.mulScale)
@@ -138,11 +95,13 @@ class YOLOV1(nn.Module):
 
         params = [
             {"params": logits_params, "lr": lr},  # 1e-3
-            {"params": self.network.backbone.parameters(), "lr": lr / 5},  # 1e-4
+            {"params": self.network.backbone.parameters(), "lr": lr / 3},  # 1e-4
         ]
 
         # self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr, weight_decay=4e-05)
-        self.optimizer = torch.optim.Adam(params, weight_decay=4e-05)
+        # self.optimizer = torch.optim.Adam(params, weight_decay=4e-05)
+        self.optimizer = optimizer.RAdam(params, weight_decay=4e-05)
+
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1)
 
         self.writer = SummaryWriter(os.path.join(basePath,summaryPath))
@@ -151,8 +110,6 @@ class YOLOV1(nn.Module):
         if self.isTrain:
             for epoch in range(self.epochs):
                 self.train(epoch)
-                if epoch>0 and epoch%30==0:
-                    self.test(3)
                 # update the learning rate
                 self.lr_scheduler.step()
                 torch.save(self.network.state_dict(), self.save_model)
@@ -167,6 +124,8 @@ class YOLOV1(nn.Module):
         self.network.train()
         num_trains = len(self.train_loader.dataset)
         for idx, (data, target) in enumerate(self.train_loader):
+            if not self.mulScale:
+                data = torch.stack(data, 0)  # 不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
             if self.use_cuda:
                 # data, target = data.to(self.device), target.to(self.device)
                 # data = data.to(self.device)
@@ -174,7 +133,6 @@ class YOLOV1(nn.Module):
                 if self.mulScale:
                     data = [d.to(self.device) for d in data]
                 else:
-                    data = torch.stack(data, 0)  # 不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
                     data = data.to(self.device)
                 target = [{k: v.to(self.device) for k, v in targ.items()} for targ in target]
 
@@ -215,6 +173,8 @@ class YOLOV1(nn.Module):
                     data = data.to(self.device)
                     # data = [d.to(self.device) for d in data]
                     new_target = [{k: v.to(self.device) for k, v in targ.items() if k!="path"} for targ in target]
+                else:
+                    new_target = target
 
                 output = self.network(data)
                 preds = self.loss_func(output,new_target)
@@ -225,7 +185,7 @@ class YOLOV1(nn.Module):
                     path = target[i]["path"]
                     image = np.asarray(PIL.Image.open(path).convert("RGB"), np.uint8)
                     # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-                    image = draw_rect(image,pred,self.classes)
+                    image = self.draw_rect(image,pred)
 
                     # cv2.imshow("test", image)
                     # cv2.waitKey(0)
@@ -234,35 +194,25 @@ class YOLOV1(nn.Module):
                     plt.show()
                     # PIL.Image.fromarray(image).show()
 
+                    # save
+                    # newPath = path.replace("PNGImages", "result")
+                    # if not os.path.exists(os.path.dirname(newPath)): os.makedirs(os.path.dirname(newPath))
+                    # cv2.imwrite(newPath, image)
 
     def predict(self):
         pass
 
-def draw_rect(image,pred,classes):
-    labels = pred["labels"]
-    bboxs = pred["boxes"]
-    scores = pred["scores"]
+    def draw_rect(self,image,pred):
+        labels = pred["labels"]
+        bboxs = pred["boxes"]
+        scores = pred["scores"]
 
-    for label,bbox,score in zip(labels,bboxs,scores):
-        label=label.cpu().numpy()
-        bbox=bbox.cpu().numpy()#.astype(np.int16)
-        score=score.cpu().numpy()
-        class_str="%s:%.3f"%(classes[int(label)],score) # 跳过背景
-        pos = list(map(int, bbox))
+        for label,bbox,score in zip(labels,bboxs,scores):
+            label=label.cpu().numpy()
+            bbox=bbox.cpu().numpy()#.astype(np.int16)
+            score=score.cpu().numpy()
+            class_str="%s:%.3f"%(self.classes[int(label)],score) # 跳过背景
+            pos = list(map(int, bbox))
 
-        image=opencv.vis_rect(image,pos,class_str,0.5,int(label))
-    return image
-
-
-if __name__=="__main__":
-    classes = ["__background__", "person"]
-    testdataPath = "C:/Users/MI/Documents/GitHub/PennFudanPed/PNGImages/"
-    # testdataPath = "/home/wucong/practise/datas/PennFudanPed/PNGImages/"
-    traindataPath = "C:/Users/MI/Documents/GitHub/PennFudanPed/"
-    # traindataPath = "/home/wucong/practise/datas/PennFudanPed/"
-    basePath = "./models/"
-    model = YOLOV1(traindataPath, testdataPath, "resnet18", pretrained=False, num_features=1,
-                   isTrain=True, num_anchors=2, num_classes=1, mulScale=False, epochs=400, print_freq=40,
-                   basePath=basePath, threshold_conf=0.2, threshold_cls=0.5, lr=3e-3, batch_size=2,
-                   conf_thres=0.5, nms_thres=0.4, classes=classes)
-    model()
+            image=opencv.vis_rect(image,pos,class_str,0.5,int(label))
+        return image

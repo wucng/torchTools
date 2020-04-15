@@ -42,7 +42,8 @@ class YOLOv1Loss(nn.Module):
             results = [self.apply_nms(result) for result in results]
             return results
         else:
-            return self.compute_loss(preds, targets)
+            # return self.compute_loss(preds, targets)
+            return self.compute_loss_fl(preds, targets)
 
     def compute_loss(self,preds_list, targets_origin):
         """
@@ -60,7 +61,7 @@ class YOLOv1Loss(nn.Module):
             "loss_no_conf": 0,
             "loss_box": 0,
             "loss_clf": 0,
-            "loss_no_clf": 0,
+            # "loss_no_clf": 0,
             # "iou_loss": iou_loss
         }
 
@@ -76,8 +77,12 @@ class YOLOv1Loss(nn.Module):
                 # normalize
                 targets = self.normalize((fh, fw), target_origin)
 
-                preds = preds.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
-                targets = targets.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
+                # preds = preds.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
+                # targets = targets.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
+
+                preds = preds.contiguous().view(-1,5 + self.num_classes)
+                targets = targets.contiguous().view(-1, 5 + self.num_classes)
+
                 index = targets[..., 4] == 1
                 no_index = targets[..., 4] != 1
                 has_obj = preds[index]
@@ -86,37 +91,96 @@ class YOLOv1Loss(nn.Module):
 
                 loss_conf = F.binary_cross_entropy(has_obj[..., 4], torch.ones_like(has_obj[..., 4]).detach(),
                                                    reduction="sum")  # 对应目标
-                loss_conf += F.binary_cross_entropy(has_obj[..., 4 + 5 + self.num_classes],
-                                                    torch.ones_like(has_obj[..., 4]).detach(), reduction="sum")  # 对应目标
-
 
                 loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
                                                       reduction="sum")  # 对应背景
-                loss_no_conf += F.binary_cross_entropy(no_obj[..., 4 + 5 + self.num_classes],
-                                                       torch.zeros_like(no_obj[..., 4]).detach(), reduction="sum")  # 对应背景
+                # boxes loss
+                # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
+                loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
+
+                # classify loss
+                # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
+
+                losses["loss_conf"] += loss_conf*5.
+                losses["loss_no_conf"] += loss_no_conf * 0.5  # 0.05
+                losses["loss_box"] += loss_box * 5.  # 50
+                losses["loss_clf"] += loss_clf
+
+        return losses
+
+    def compute_loss_fl(self,preds_list, targets_origin,alpha=1.0,gamma=2):
+        """
+        结合 focal loss
+        :param preds:
+                if mulScale: # 使用多尺度（2个特征为例,batch=2）
+                    preds=[[(1,28,28,12),(1,14,14,12)],[(1,28,28,12),(1,14,14,12)]]
+                else: #（2个特征为例,batch=2）
+                   preds=[(2,28,28,12),(2,14,14,12)]
+        :param targets:
+                [{"boxes":(n,4),"labels":(n,)},{"boxes":(m,4),"labels":(m,)}]
+        :return:
+        """
+        losses = {
+            "loss_conf": 0,
+            "loss_no_conf": 0,
+            "loss_box": 0,
+            "loss_clf": 0,
+            # "loss_no_clf": 0,
+            # "iou_loss": iou_loss
+        }
+
+        for jj in range(len(targets_origin)):
+            target_origin = targets_origin[jj]
+            if self.mulScale:
+                pred_list = preds_list[jj]
+            else:
+                pred_list =[pred[jj].unsqueeze(0) for pred in preds_list]
+
+            for i, preds in enumerate(pred_list):
+                fh, fw = preds.shape[1:-1]
+                # normalize
+                targets = self.normalize((fh, fw), target_origin)
+
+                # preds = preds.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
+                # targets = targets.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
+
+                preds = preds.contiguous().view(-1,5 + self.num_classes)
+                targets = targets.contiguous().view(-1, 5 + self.num_classes)
+
+                index = targets[..., 4] == 1
+                no_index = targets[..., 4] != 1
+                has_obj = preds[index]
+                no_obj = preds[no_index]
+                targ_obj = targets[index]
+
+                loss_conf = F.binary_cross_entropy(has_obj[..., 4], torch.ones_like(has_obj[..., 4]).detach(),
+                                                   reduction="sum")  # 对应目标
+                pt = torch.exp(-loss_conf)
+                loss_conf = alpha * (1 - pt) ** gamma * loss_conf
+
+                loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
+                                                      reduction="sum")  # 对应背景
+                pt = torch.exp(-loss_no_conf)
+                loss_no_conf = alpha * (1 - pt) ** gamma * loss_no_conf
 
                 # boxes loss
                 # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
-                # loss_box += F.mse_loss(has_obj[...,5+self.num_classes:4+5+self.num_classes],targ_obj[...,:4].detach(),reduction="sum")
-
                 loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
-                loss_box += F.smooth_l1_loss(has_obj[..., 5 + self.num_classes:4 + 5 + self.num_classes],
-                                             targ_obj[..., 5 + self.num_classes:4 + 5 + self.num_classes].detach(), reduction="sum")
+                pt = torch.exp(-loss_box)
+                loss_box = alpha * (1 - pt) ** gamma * loss_box
 
                 # classify loss
-                loss_clf = F.binary_cross_entropy(has_obj[..., 5], targ_obj[..., 5].detach(), reduction="sum")
-                loss_clf += F.binary_cross_entropy(has_obj[..., 5 + 5 + self.num_classes], targ_obj[..., 5].detach(),
-                                                   reduction="sum")
+                # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
+                pt = torch.exp(-loss_clf)
+                loss_clf = alpha * (1 - pt) ** gamma * loss_clf
 
-                loss_no_clf = F.binary_cross_entropy(no_obj[..., 5], torch.zeros_like(no_obj[..., 5]).detach(), reduction="sum")
-                loss_no_clf += F.binary_cross_entropy(no_obj[..., 5 + 5 + self.num_classes],
-                                                      torch.zeros_like(no_obj[..., 5]).detach(), reduction="sum")
 
-                losses["loss_conf"] += loss_conf
-                losses["loss_no_conf"] += loss_no_conf * 0.05  # 0.05
-                losses["loss_box"] += loss_box * 50.  # 50
+                losses["loss_conf"] += loss_conf*5.
+                losses["loss_no_conf"] += loss_no_conf * 0.5  # 0.05
+                losses["loss_box"] += loss_box * 5.  # 50
                 losses["loss_clf"] += loss_clf
-                losses["loss_no_clf"] += loss_no_clf * 0.05  # 0.05
 
         return losses
 
@@ -129,7 +193,7 @@ class YOLOv1Loss(nn.Module):
         strides_w = w//grid_ceil_w
 
         result = torch.zeros([1, grid_ceil_h, grid_ceil_w, # len(labels)
-                              self.num_anchors * (5 + self.num_classes)],
+                              self.num_anchors, 5 + self.num_classes],
                              dtype=boxes.dtype,
                              device=boxes.device)
 
@@ -159,12 +223,12 @@ class YOLOv1Loss(nn.Module):
         y0 = (y0 - grid_ceil[1].float() * strides_h) / strides_h
 
         for i, (y, x) in enumerate(zip(grid_ceil[1], grid_ceil[0])):
-            result[idx, y, x, [0, 0 + 5 + self.num_classes]] = x0[i]
-            result[idx, y, x, [1, 1 + 5 + self.num_classes]] = y0[i]
-            result[idx, y, x, [2, 2 + 5 + self.num_classes]] = w_b[i]
-            result[idx, y, x, [3, 3 + 5 + self.num_classes]] = h_b[i]
-            result[idx, y, x, [4, 4 + 5 + self.num_classes]] = 1  # 置信度
-            result[idx, y, x, [5, 5 + 5 + self.num_classes]] = label[i].float()+1 # 源数据传入的标签都是从0开始的，加1这样0对应 就是背景
+            result[idx, y, x, :,0] = x0[i]
+            result[idx, y, x, :,1] = y0[i]
+            result[idx, y, x, :,2] = w_b[i]
+            result[idx, y, x, :,3] = h_b[i]
+            result[idx, y, x, :,4] = 1  # 置信度
+            result[idx, y, x, :,5+int(label[i])] = 1 # 转成one-hot
 
         return result
 
@@ -187,11 +251,12 @@ class YOLOv1Loss(nn.Module):
             new_preds = torch.zeros_like(preds)[:, 0, :]
             for i, p in enumerate(preds):
                 # conf
-                if p[0, 4] * p[0, 5] > p[1, 4] * p[1, 5]:
+                # if p[0, 4] * p[0, 5] > p[1, 4] * p[1, 5]:
                 # if p[0, 4] > p[1, 4]:
-                    new_preds[i] = preds[i, 0, :]
-                else:
-                    new_preds[i] = preds[i, 1, :]
+                #     new_preds[i] = preds[i, 0, :]
+                # else:
+                #     new_preds[i] = preds[i, 1, :]
+                new_preds[i]=preds[i, p[:,4].argmax(), :]
 
 
             preds = new_preds.contiguous().view(bs, -1, 5 + self.num_classes)
@@ -200,7 +265,7 @@ class YOLOv1Loss(nn.Module):
                 targets = targets_origin[i]
                 pred_box = preds[i, :, :4]
                 pred_conf = preds[i, :, 4]
-                pred_cls = preds[i, :, 5]  # *pred_conf # # 推理时做 p_cls*confidence
+                pred_cls = preds[i, :, 5:]  # *pred_conf # # 推理时做 p_cls*confidence
 
                 # 转成x1,y1,x2,y2
                 pred_box = self.reverse_normalize((fh, fw), pred_box,targets)
@@ -219,20 +284,32 @@ class YOLOv1Loss(nn.Module):
                 condition = confidence > self.threshold_conf
 
                 keep = torch.nonzero(condition).squeeze(1)
-                pred_box = pred_box[keep]
-                pred_cls = pred_cls[keep]
-                confidence = confidence[keep]
 
-                # labels and scores
-                # scores, labels = torch.softmax(pred_cls, -1).max(dim=1)
-                # scores, labels = pred_cls.max(dim=1)
+                if len(keep)==0:
+                    pred_box = torch.zeros([1,4],dtype=pred_box.dtype,device=pred_box.device)
+                    scores = torch.zeros([1,1],dtype=pred_box.dtype,device=pred_box.device)
+                    labels = torch.zeros([1,1],dtype=pred_box.dtype,device=pred_box.device)
+                    confidence = torch.zeros([1,1],dtype=pred_box.dtype,device=pred_box.device)
 
-                scores, labels = pred_cls, torch.ones_like(pred_cls)
+                else:
+                    pred_box = pred_box[keep]
+                    pred_cls = pred_cls[keep]
+                    confidence = confidence[keep]
 
-                # 过滤分类分数低的
-                # keep = torch.nonzero(scores > self.threshold_cls).squeeze(1)
-                keep = torch.nonzero(scores > self.threshold_cls)
-                pred_box, scores, labels, confidence = pred_box[keep], scores[keep], labels[keep], confidence[keep]
+                    # labels and scores
+                    scores, labels = torch.softmax(pred_cls, -1).max(dim=1)
+                    # scores, labels = pred_cls.max(dim=1)
+
+                    # 过滤分类分数低的
+                    # keep = torch.nonzero(scores > self.threshold_cls).squeeze(1)
+                    keep = torch.nonzero(scores > self.threshold_cls)
+                    if len(keep)==0:
+                        pred_box = torch.zeros([1, 4], dtype=pred_box.dtype, device=pred_box.device)
+                        scores = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
+                        labels = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
+                        confidence = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
+                    else:
+                        pred_box, scores, labels, confidence = pred_box[keep], scores[keep], labels[keep], confidence[keep]
 
                 if len(result) < bs:
                     result.append({"boxes": pred_box, "scores": scores, "labels": labels, "confidence": confidence})

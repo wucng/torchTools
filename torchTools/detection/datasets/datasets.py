@@ -51,7 +51,8 @@ class PascalVOCDataset(Dataset):
     http://host.robots.ox.ac.uk/pascal/VOC/
     """
     def __init__(self, root,year=2007,transforms=None,classes=[]):
-        self.root = os.path.join(root,"VOCdevkit","VOC%s"%(year))
+        # self.root = os.path.join(root,"VOCdevkit","VOC%s"%(year))
+        self.root = os.path.join(root,"VOC%s"%(year))
         self.transforms = transforms
         self.classes=classes
         self.annotations = self.change2csv()
@@ -307,7 +308,7 @@ class PennFudanDataset(Dataset):
     # extract it in the current folder
     unzip PennFudanPed.zip
     """
-    def __init__(self, root, transforms=None):
+    def __init__(self, root, transforms=None,classes=[]):
         # root=os.path.join(root,"PennFudanPed")
         self.root = root
         self.transforms = transforms

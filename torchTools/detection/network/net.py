@@ -33,7 +33,7 @@ class BackBoneNet(nn.Module):
     def __init__(self,model_name="resnet101", pretrained=False,dropRate=0.5):
         super(BackBoneNet, self).__init__()
         self.pretrained = pretrained
-        self.dropRate = dropRate
+        # self.dropRate = dropRate
 
         model_dict ={'resnet18':512,
                      'resnet34':512,
@@ -61,10 +61,10 @@ class BackBoneNet(nn.Module):
 
         self.backbone = nn.ModuleList()
         self.backbone.append(layer0)
-        self.backbone.append(_model.layer1)
-        self.backbone.append(_model.layer2)
-        self.backbone.append(_model.layer3)
-        self.backbone.append(_model.layer4)
+        self.backbone.append(nn.Sequential(_model.layer1,nn.Dropout(dropRate)))
+        self.backbone.append(nn.Sequential(_model.layer2,nn.Dropout(dropRate)))
+        self.backbone.append(nn.Sequential(_model.layer3,nn.Dropout(dropRate)))
+        self.backbone.append(nn.Sequential(_model.layer4,nn.Dropout(dropRate)))
 
         self.num_features = len(self.backbone)-1
 
@@ -73,7 +73,6 @@ class BackBoneNet(nn.Module):
         for i,net in enumerate(self.backbone):
             x = net(x)
             if i>0:
-                x = F.dropout(x,self.dropRate)
                 out.append(x)
         return out
 
@@ -219,7 +218,7 @@ class YOLOV1Net(nn.Module):
                 # 每个box对应一个类别
                 # 每个anchor对应4个坐标
                 # nn.BatchNorm2d(num_anchors * (5 + num_classes)),
-                # nn.Sigmoid()
+                nn.Sigmoid()
             )
 
             self.net.append(convp)
@@ -231,12 +230,6 @@ class YOLOV1Net(nn.Module):
         for i in range(self.num_features):
             p = self.net[i](p_x[i])
             p = p.permute(0, 2, 3, 1)  # (-1,7,7,30)
-            # """
-            bs,fh,fw,c=p.shape
-            p = p.contiguous().view(bs,fh,fw,self.num_anchors,5 + self.num_classes)
-            p[...,:5] = torch.sigmoid(p[...,:5])
-            p = p.contiguous().view(bs,fh,fw,self.num_anchors*(5 + self.num_classes))
-            # """
 
             out.append(p)
 

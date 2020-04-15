@@ -276,10 +276,12 @@ class YOLOV1(nn.Module):
 
 
 if __name__=="__main__":
-    """
+    # """
     classes = ["person"]
-    testdataPath = "/home/wucong/practise/datas/valid/PNGImages/"
-    traindataPath = "/home/wucong/practise/datas/PennFudanPed/"
+    # testdataPath = "/home/wucong/practise/datas/valid/PNGImages/"
+    # traindataPath = "/home/wucong/practise/datas/PennFudanPed/"
+    testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
+    traindataPath = "D:/practice/datas/PennFudanPed/"
     typeOfData = "PennFudanDataset"
     """
     classes = ["bicycle", "bus", "car", "motorbike", "person"]
@@ -289,9 +291,9 @@ if __name__=="__main__":
     # """
 
     basePath = "./models/"
-    model = YOLOV1(traindataPath, testdataPath, "resnet50", pretrained=True, num_features=1,resize=(416,416),
-                   isTrain=True, num_anchors=2, mulScale=False, epochs=400, print_freq=40,
-                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=3e-3, batch_size=4,
-                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=1024)
+    model = YOLOV1(traindataPath, testdataPath, "resnet18", pretrained=True, num_features=1,resize=(224,224),
+                   isTrain=False, num_anchors=2, mulScale=False, epochs=400, print_freq=40,dropRate=0.5,
+                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=3e-3, batch_size=2,
+                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256)
 
     model()

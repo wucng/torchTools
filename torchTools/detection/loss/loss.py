@@ -99,12 +99,12 @@ class YOLOv1Loss(nn.Module):
                 loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
 
                 # classify loss
-                # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
-                loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
+                loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                # loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
 
-                losses["loss_conf"] += loss_conf*5.
-                losses["loss_no_conf"] += loss_no_conf * 0.5  # 0.05
-                losses["loss_box"] += loss_box * 5.  # 50
+                losses["loss_conf"] += loss_conf
+                losses["loss_no_conf"] += loss_no_conf * 0.05  # 0.05
+                losses["loss_box"] += loss_box * 50.  # 50
                 losses["loss_clf"] += loss_clf
 
         return losses
@@ -171,15 +171,14 @@ class YOLOv1Loss(nn.Module):
                 loss_box = alpha * (1 - pt) ** gamma * loss_box
 
                 # classify loss
-                # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
-                loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
+                loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                # loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
                 pt = torch.exp(-loss_clf)
                 loss_clf = alpha * (1 - pt) ** gamma * loss_clf
 
-
-                losses["loss_conf"] += loss_conf*5.
-                losses["loss_no_conf"] += loss_no_conf * 0.5  # 0.05
-                losses["loss_box"] += loss_box * 5.  # 50
+                losses["loss_conf"] += loss_conf
+                losses["loss_no_conf"] += loss_no_conf * 0.05  # 0.05
+                losses["loss_box"] += loss_box * 50.  # 50
                 losses["loss_clf"] += loss_clf
 
         return losses
@@ -248,16 +247,21 @@ class YOLOv1Loss(nn.Module):
             preds = preds.contiguous().view(-1, self.num_anchors, 5 + self.num_classes)
             # preds = preds.contiguous().view(bs,fh,fw,self.num_anchors,5 + self.num_classes)
             # 选择置信度最高的对应box(多个box时)
-            new_preds = torch.zeros_like(preds)[:, 0, :]
-            for i, p in enumerate(preds):
+            # new_preds = torch.zeros_like(preds)[:, 0, :]
+            # for i, p in enumerate(preds):
                 # conf
                 # if p[0, 4] * p[0, 5] > p[1, 4] * p[1, 5]:
                 # if p[0, 4] > p[1, 4]:
                 #     new_preds[i] = preds[i, 0, :]
                 # else:
                 #     new_preds[i] = preds[i, 1, :]
-                new_preds[i]=preds[i, p[:,4].argmax(), :]
+                # new_preds[i]=preds[i, p[:,4].argmax(), :]
+                # new_preds[i]=preds[i, p[:,5:].max(-1)[1], :]
+                # new_preds[i]=preds[i, (p[:,4]*p[:,5:].max(-1)[0]).argmax(), :]
 
+            # new_preds = preds[:, preds[:, :, 4].max(1)[1], :][:, 0, :]
+            # new_preds = preds[:, preds[:, :, 5:].max(-1)[0].max(1)[1], :][:, 0, :]
+            new_preds = preds[:, (preds[:, :, 4]*preds[:, :, 5:].max(-1)[0]).max(1)[1], :][:, 0, :]
 
             preds = new_preds.contiguous().view(bs, -1, 5 + self.num_classes)
 
@@ -297,8 +301,8 @@ class YOLOv1Loss(nn.Module):
                     confidence = confidence[keep]
 
                     # labels and scores
-                    scores, labels = torch.softmax(pred_cls, -1).max(dim=1)
-                    # scores, labels = pred_cls.max(dim=1)
+                    # scores, labels = torch.softmax(pred_cls, -1).max(dim=1)
+                    scores, labels = pred_cls.max(dim=1)
 
                     # 过滤分类分数低的
                     # keep = torch.nonzero(scores > self.threshold_cls).squeeze(1)

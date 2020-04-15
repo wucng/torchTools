@@ -95,8 +95,8 @@ class YOLOv1Loss(nn.Module):
                 loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
                                                       reduction="sum")  # 对应背景
                 # boxes loss
-                # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
-                loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
+                loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
+                # loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
 
                 # classify loss
                 loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
@@ -165,8 +165,8 @@ class YOLOv1Loss(nn.Module):
                 loss_no_conf = alpha * (1 - pt) ** gamma * loss_no_conf
 
                 # boxes loss
-                # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
-                loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
+                loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
+                # loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
                 pt = torch.exp(-loss_box)
                 loss_box = alpha * (1 - pt) ** gamma * loss_box
 
@@ -262,6 +262,7 @@ class YOLOv1Loss(nn.Module):
             # new_preds = preds[:, preds[:, :, 4].max(1)[1], :][:, 0, :]
             # new_preds = preds[:, preds[:, :, 5:].max(-1)[0].max(1)[1], :][:, 0, :]
             new_preds = preds[:, (preds[:, :, 4]*preds[:, :, 5:].max(-1)[0]).max(1)[1], :][:, 0, :]
+
 
             preds = new_preds.contiguous().view(bs, -1, 5 + self.num_classes)
 

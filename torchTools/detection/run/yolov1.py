@@ -50,7 +50,6 @@ class YOLOV1(nn.Module):
         self.epochs = epochs
         self.print_freq = print_freq
         self.isTrain = isTrain
-        self.mulScale = mulScale
         self.classes = classes
         num_classes = len(self.classes)
 

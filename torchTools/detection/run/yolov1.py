@@ -37,7 +37,7 @@ def collate_fn(batch_data):
 
 class YOLOV1(nn.Module):
     def __init__(self,train_dataset=None,test_dataset=None,model_name="resnet18",num_features=None,
-                 pretrained=False,dropRate=0.5, usize=256,isTrain=False,
+                 pretrained=False,dropRate=0.5, usize=256,isTrain=False,mulScale=False,
                  basePath="./",save_model = "model.pt",summaryPath="yolov1_resnet50_416",
                  epochs = 100,print_freq=50,
                  batch_size=2,num_anchors=2,lr=3e-3,
@@ -50,6 +50,7 @@ class YOLOV1(nn.Module):
         self.epochs = epochs
         self.print_freq = print_freq
         self.isTrain = isTrain
+        self.mulScale = mulScale
         self.classes = classes
         num_classes = len(self.classes)
 

@@ -26,7 +26,7 @@ train_dataset = datasets.PennFudanDataset(traindataPath,train_transforms,classes
 test_dataset = datasets.ValidDataset(testdataPath,test_transforms)
 
 model = yolov1.YOLOV1(train_dataset, test_dataset, "resnet18", pretrained=True, num_features=1,
-                   isTrain=True, num_anchors=2, epochs=400, print_freq=40,
+                   isTrain=True, num_anchors=2, epochs=400, print_freq=40,mulScale=mulScale,
                    basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=3e-3, batch_size=4,
                    conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256)
 

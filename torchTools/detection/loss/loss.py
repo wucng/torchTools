@@ -94,8 +94,8 @@ class YOLOv1Loss(nn.Module):
                 loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
                                                       reduction="sum")  # 对应背景
                 # boxes loss
-                loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
-                # loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
+                # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
+                loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
 
                 # classify loss
                 loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")

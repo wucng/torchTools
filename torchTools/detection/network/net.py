@@ -84,14 +84,14 @@ class FPNNet(nn.Module):
         self.net = nn.ModuleList()
         for i in range(num_features):
             m = nn.Sequential(
-                nn.Conv2d(backbone_size//2**i, usize, 1),
-                nn.BatchNorm2d(usize),
+                nn.Conv2d(backbone_size//2**i, backbone_size//2**i, 1),
+                nn.BatchNorm2d(backbone_size//2**i),
                 # nn.ReLU()
                 nn.LeakyReLU(0.2)
             )
 
             p = nn.Sequential(
-                nn.Conv2d(usize, usize, 3, stride=1, padding=1),
+                nn.Conv2d(backbone_size//2**i, usize, 3, stride=1, padding=1),
                 nn.BatchNorm2d(usize),
                 # nn.ReLU()
                 nn.LeakyReLU(0.2)
@@ -239,7 +239,7 @@ class YOLOV1Net(nn.Module):
 
 
 if __name__ == "__main__":
-    net = YOLOV1Net(model_name="resnet50", usize=256,num_features=1)
+    net = YOLOV1Net(model_name="resnet18", usize=256,num_features=4)
     # x = torch.rand([5,3,224,224])
     # print(net(x).shape)
     torch.save(net.state_dict(), "./model.pt")

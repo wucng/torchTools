@@ -239,7 +239,7 @@ class YOLOV1(nn.Module):
                     if pred is None:continue
                     path = target[i]["path"]
                     image = np.asarray(PIL.Image.open(path).convert("RGB"), np.uint8)
-                    # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+                    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
                     image = self.draw_rect(image,pred)
 
                     # cv2.imshow("test", image)
@@ -280,10 +280,10 @@ if __name__=="__main__":
     classes = ["person"]
     # testdataPath = "/home/wucong/practise/datas/valid/PNGImages/"
     # traindataPath = "/home/wucong/practise/datas/PennFudanPed/"
-    # testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
-    # traindataPath = "D:/practice/datas/PennFudanPed/"
-    testdataPath = r"C:\practice\data\PennFudanPed\PNGImages"
-    traindataPath = r"C:\practice\data\PennFudanPed"
+    testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
+    traindataPath = "D:/practice/datas/PennFudanPed/"
+    # testdataPath = r"C:\practice\data\PennFudanPed\PNGImages"
+    # traindataPath = r"C:\practice\data\PennFudanPed"
     typeOfData = "PennFudanDataset"
     """
     classes = ["bicycle", "bus", "car", "motorbike", "person"]
@@ -293,9 +293,9 @@ if __name__=="__main__":
     # """
 
     basePath = "./models/"
-    model = YOLOV1(traindataPath, testdataPath, "resnet18", pretrained=False, num_features=1,resize=(224,224),
-                   isTrain=True, num_anchors=2, mulScale=False, epochs=400, print_freq=40,dropRate=0.5,
+    model = YOLOV1(traindataPath, testdataPath, "resnet18", pretrained=True, num_features=1,resize=(416,416),
+                   isTrain=False, num_anchors=2, mulScale=False, epochs=400, print_freq=40,dropRate=0.5,
                    basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,
-                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256)
+                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=512)
 
     model()

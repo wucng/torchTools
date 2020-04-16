@@ -74,7 +74,8 @@ class YOLOV1(nn.Module):
         if network is None:
             self.network = net.YOLOV1Net(num_classes,num_anchors,model_name,num_features,pretrained,dropRate,usize)
         else:
-            self.network = network
+            self.network = network(num_classes,num_anchors,model_name,num_features,pretrained,dropRate,usize)
+
         # self.network.apply(net.weights_init)
         self.network.fpn.apply(net.weights_init) # backbone 不使用
         self.network.net.apply(net.weights_init)

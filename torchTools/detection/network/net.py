@@ -97,11 +97,14 @@ class FPNNet(nn.Module):
                 nn.LeakyReLU(0.2)
             )
 
-            upsample = nn.Sequential(
-                nn.ConvTranspose2d(usize,usize,3,2,1,1),
-                nn.BatchNorm2d(usize),
-                nn.LeakyReLU(0.2),
-            )
+            if i>0:
+                upsample = nn.Sequential(
+                    nn.ConvTranspose2d(backbone_size//2**(i-1),backbone_size//2**i,3,2,1,1),
+                    nn.BatchNorm2d(backbone_size//2**i),
+                    nn.LeakyReLU(0.2),
+                )
+            else:
+                upsample = None
 
             tmp = nn.ModuleList()
             tmp.append(m)
@@ -240,6 +243,6 @@ class YOLOV1Net(nn.Module):
 
 if __name__ == "__main__":
     net = YOLOV1Net(model_name="resnet18", usize=256,num_features=4)
-    # x = torch.rand([5,3,224,224])
-    # print(net(x).shape)
-    torch.save(net.state_dict(), "./model.pt")
+    x = torch.rand([5,3,224,224])
+    print(net(x)[-1].shape)
+    # torch.save(net.state_dict(), "./model.pt")

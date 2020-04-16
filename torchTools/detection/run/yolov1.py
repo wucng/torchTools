@@ -40,7 +40,7 @@ class YOLOV1(nn.Module):
                  pretrained=False,dropRate=0.5, usize=256,isTrain=False,mulScale=False,
                  basePath="./",save_model = "model.pt",summaryPath="yolov1_resnet50_416",
                  epochs = 100,print_freq=50,
-                 batch_size=2,num_anchors=2,lr=3e-3,
+                 batch_size=2,num_anchors=2,lr=2e-3,
                  threshold_conf=0.5,threshold_cls=0.5, #  # 0.05,0.5
                  conf_thres=0.7,nms_thres=0.4, # 0.8,0.4
                  filter_labels = [],classes=[]):
@@ -95,7 +95,7 @@ class YOLOV1(nn.Module):
 
         params = [
             {"params": logits_params, "lr": lr},  # 1e-3
-            {"params": self.network.backbone.parameters(), "lr": lr / 3},  # 1e-4
+            {"params": self.network.backbone.parameters(), "lr": lr / 10},  # 1e-4
         ]
 
         # self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr, weight_decay=4e-05)

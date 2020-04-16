@@ -40,7 +40,7 @@ class YOLOV1(nn.Module):
                  pretrained=False,dropRate=0.5, usize=256,isTrain=False,
                  basePath="./",save_model = "model.pt",summaryPath="yolov1_resnet50_416",
                  epochs = 100,print_freq=1,resize:tuple = (224,224),
-                 mulScale=False,advanced=False,batch_size=2,num_anchors=2,lr=2e-4,
+                 mulScale=False,advanced=False,batch_size=2,num_anchors=2,lr=2e-3,
                  # num_classes=20,
                  typeOfData="PennFudanDataset",
                  threshold_conf=0.5,threshold_cls=0.5, #  # 0.05,0.5
@@ -148,7 +148,7 @@ class YOLOV1(nn.Module):
 
         params = [
             {"params": logits_params, "lr": lr},  # 1e-3
-            {"params": self.network.backbone.parameters(), "lr": lr / 3},  # 1e-4
+            {"params": self.network.backbone.parameters(), "lr": lr / 10},  # 1e-4
         ]
 
         # self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr, weight_decay=4e-05)
@@ -280,8 +280,10 @@ if __name__=="__main__":
     classes = ["person"]
     # testdataPath = "/home/wucong/practise/datas/valid/PNGImages/"
     # traindataPath = "/home/wucong/practise/datas/PennFudanPed/"
-    testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
-    traindataPath = "D:/practice/datas/PennFudanPed/"
+    # testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
+    # traindataPath = "D:/practice/datas/PennFudanPed/"
+    testdataPath = r"C:\practice\data\PennFudanPed\PNGImages"
+    traindataPath = r"C:\practice\data\PennFudanPed"
     typeOfData = "PennFudanDataset"
     """
     classes = ["bicycle", "bus", "car", "motorbike", "person"]
@@ -291,9 +293,9 @@ if __name__=="__main__":
     # """
 
     basePath = "./models/"
-    model = YOLOV1(traindataPath, testdataPath, "resnet18", pretrained=True, num_features=1,resize=(224,224),
-                   isTrain=False, num_anchors=2, mulScale=False, epochs=400, print_freq=40,dropRate=0.5,
-                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=3e-3, batch_size=2,
+    model = YOLOV1(traindataPath, testdataPath, "resnet18", pretrained=False, num_features=1,resize=(224,224),
+                   isTrain=True, num_anchors=2, mulScale=False, epochs=400, print_freq=40,dropRate=0.5,
+                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,
                    conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256)
 
     model()

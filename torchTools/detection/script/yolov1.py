@@ -51,11 +51,11 @@ class History():
 
     def show(self):
         fig, ax = plt.subplots(1, 1, figsize=(15, 5))
-        ax[0].set_title("train loss")
+        ax.set_title("train loss")
         for i,(k,v) in enumerate(self.history.items()):
-            # ax[0].set_title(k)
-            ax[0].plot(self.epoch,v,label=k)
-        ax[0].legend()
+            # ax.set_title(k)
+            ax.plot(self.epoch,v,label=k)
+        ax.legend()
         plt.show()
 
 class YOLOV1(nn.Module):

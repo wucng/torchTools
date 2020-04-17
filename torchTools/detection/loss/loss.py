@@ -374,3 +374,307 @@ class YOLOv1Loss(nn.Module):
                     last_boxes[i][3] -= diff - diff // 2
 
             return {"scores": last_scores, "labels": last_labels, "boxes": last_boxes}
+
+class YOLOv2Loss(YOLOv1Loss):
+    """
+    5个先验框的width和height:(输入大小=416，stride=32，对应的先念框)
+    COCO: (0.57273, 0.677385), (1.87446, 2.06253), (3.33843, 5.47434), (7.88282, 3.52778), (9.77052, 9.16828)
+    VOC: (1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053), (11.2364, 10.0071)
+    """
+    # w,h
+    PreBoxSize = [(1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053), (11.2364, 10.0071)]
+    PreFSize = 416//32
+    # PreStride = 32
+    # PreSize = 416
+
+    def __init__(self, device="cpu", num_anchors=5,
+                 num_classes=20,  # 不包括背景
+                 threshold_conf=0.05,
+                 threshold_cls=0.5,
+                 conf_thres=0.8,
+                 nms_thres=0.4,
+                 filter_labels: list = [],
+                 mulScale=False,):
+        super(YOLOv2Loss,self).__init__(device, num_anchors,
+                                        num_classes,threshold_conf,threshold_cls,
+                                        conf_thres,nms_thres,filter_labels,mulScale)
+
+        assert num_anchors==len(self.PreBoxSize),print("num_anchors:%d not equal num of PreBoxSize"%(num_anchors))
+
+
+    def normalize2(self, featureShape, target):
+        """不做筛选所有的anchor都参与计算"""
+        grid_ceil_h, grid_ceil_w = featureShape
+        h, w = target["resize"]
+        boxes = target["boxes"]
+        labels = target["labels"]
+        strides_h = h // grid_ceil_h
+        strides_w = w // grid_ceil_w
+
+        result = torch.zeros([1, grid_ceil_h, grid_ceil_w,  # len(labels)
+                              self.num_anchors, 5 + self.num_classes],
+                             dtype=boxes.dtype,
+                             device=boxes.device)
+
+        # for idx, (box, label) in enumerate(zip(boxes, labels)):
+        idx = 0
+        box = boxes
+        label = labels
+        # x1,y1,x2,y2->x0,y0,w,h
+        x1 = box[:, 0]
+        y1 = box[:, 1]
+        x2 = box[:, 2]
+        y2 = box[:, 3]
+
+        # [x0,y0,w,h]
+        x0 = (x1 + x2) / 2.
+        y0 = (y1 + y2) / 2.
+        # w_b = (x2 - x1) / w  # 0~1
+        # h_b = (y2 - y1) / h  # 0~1
+        w_b = (x2 - x1) / strides_w
+        h_b = (y2 - y1) / strides_h
+
+        # 判断box落在哪个grid ceil
+        # 取格网左上角坐标
+        grid_ceil = ((x0 / strides_w).int(), (y0 / strides_h).int())
+
+        # normal 0~1
+        # gt_box 中心点坐标-对应grid cell左上角的坐标/ 格网大小使得范围变成0到1
+        x0 = (x0 - grid_ceil[0].float() * strides_w) / strides_w
+        y0 = (y0 - grid_ceil[1].float() * strides_h) / strides_h
+
+
+        for i, (y, x) in enumerate(zip(grid_ceil[1], grid_ceil[0])):
+            for j in range(self.num_anchors):  # 对应到每个先念框
+                # 计算对应先念框的 h与w
+                pw, ph = self.PreBoxSize[j]
+                pw *= (grid_ceil_w / self.PreFSize)
+                ph *= (grid_ceil_h / self.PreFSize)
+
+                result[idx, y, x, j, 0] = x0[i]
+                result[idx, y, x, j, 1] = y0[i]
+                result[idx, y, x, j, 2] = torch.log(w_b[i]/pw)
+                result[idx, y, x, j, 3] = torch.log(h_b[i]/ph)
+                result[idx, y, x, j, 4] = 1  # 置信度
+                result[idx, y, x, j, 5 + int(label[i])] = 1  # 转成one-hot
+
+        return result
+
+    def normalize(self, featureShape, target):
+        """加入按IOU筛选最好的anchor"""
+        grid_ceil_h, grid_ceil_w = featureShape
+        h, w = target["resize"]
+        boxes = target["boxes"]
+        labels = target["labels"]
+        strides_h = h // grid_ceil_h
+        strides_w = w // grid_ceil_w
+
+        result = torch.zeros([1, grid_ceil_h, grid_ceil_w,  # len(labels)
+                              self.num_anchors, 5 + self.num_classes],
+                             dtype=boxes.dtype,
+                             device=boxes.device)
+
+        # for idx, (box, label) in enumerate(zip(boxes, labels)):
+        idx = 0
+        box = boxes
+        label = labels
+        # x1,y1,x2,y2->x0,y0,w,h
+        x1 = box[:, 0]
+        y1 = box[:, 1]
+        x2 = box[:, 2]
+        y2 = box[:, 3]
+
+        # [x0,y0,w,h]
+        x0 = (x1 + x2) / 2.
+        y0 = (y1 + y2) / 2.
+        # w_b = (x2 - x1) / w  # 0~1
+        # h_b = (y2 - y1) / h  # 0~1
+        w_b = (x2 - x1) / strides_w
+        h_b = (y2 - y1) / strides_h
+
+        # 判断box落在哪个grid ceil
+        # 取格网左上角坐标
+        grid_ceil = ((x0 / strides_w).int(), (y0 / strides_h).int())
+
+        # normal 0~1
+        # gt_box 中心点坐标-对应grid cell左上角的坐标/ 格网大小使得范围变成0到1
+        x0 = (x0 - grid_ceil[0].float() * strides_w) / strides_w
+        y0 = (y0 - grid_ceil[1].float() * strides_h) / strides_h
+
+        # 找到与哪个先验框的IOU最大
+        gt_boxes = torch.stack((w_b,h_b),1)
+        anchors = torch.as_tensor(self.PreBoxSize, device=self.device)
+        temp_anchors = torch.cat((torch.zeros_like(anchors), anchors), -1)
+        temp_gt_boxes = torch.cat((torch.zeros_like(gt_boxes), gt_boxes), -1)
+
+        # IOU阈值
+        # iou_thres = 0.5
+
+        for i, (y, x) in enumerate(zip(grid_ceil[1], grid_ceil[0])):
+            # 按IOU筛选最好的anchor
+            iou = box_iou(temp_anchors, temp_gt_boxes[i][None,:])
+            best_iou, best_anchor = iou.max(dim=0)
+
+            # 计算对应先念框的 h与w
+            pw, ph = self.PreBoxSize[best_anchor]
+            pw *= (grid_ceil_w / self.PreFSize)
+            ph *= (grid_ceil_h / self.PreFSize)
+
+            result[idx, y, x, best_anchor, 0] = x0[i]
+            result[idx, y, x, best_anchor, 1] = y0[i]
+            result[idx, y, x, best_anchor, 2] = torch.log(w_b[i]/pw)
+            result[idx, y, x, best_anchor, 3] = torch.log(h_b[i]/ph)
+            result[idx, y, x, best_anchor, 4] = 1  # 置信度
+            result[idx, y, x, best_anchor, 5 + int(label[i])] = 1  # 转成one-hot
+
+        return result
+
+    def predict(self, preds_list,targets_origin):
+        """
+        :param preds_list:
+                   #（2个特征为例,batch=2）
+                   preds_list=[(2,28,28,12),(2,14,14,12)]
+        :param targets_origin:
+                  [{"resize":(h,w),"origin_size":(h,w)},{"resize":(h,w),"origin_size":(h,w)}]
+        :return:
+        """
+        result = []
+
+        for idx, preds in enumerate(preds_list):
+            bs, fh, fw = preds.shape[:-1]
+            preds = preds.contiguous().view(bs,-1, self.num_anchors, 5 + self.num_classes)
+
+            for i in range(bs):
+                targets = targets_origin[i]
+                pred_box = preds[i, :,: :4]
+                pred_conf = preds[i, :,:, 4].contiguous().view(-1)
+                pred_cls = preds[i, :,:, 5:].contiguous().view(-1,self.num_classes)  # *pred_conf # # 推理时做 p_cls*confidence
+
+                # 转成x1,y1,x2,y2
+                pred_box = self.reverse_normalize((fh, fw), pred_box,targets).contiguous().view(-1,4)
+
+                confidence = pred_conf
+
+                condition = confidence > self.threshold_conf
+
+                keep = torch.nonzero(condition).squeeze(1)
+
+                if len(keep)==0:
+                    pred_box = torch.zeros([1,4],dtype=pred_box.dtype,device=pred_box.device)
+                    scores = torch.zeros([1,1],dtype=pred_box.dtype,device=pred_box.device)
+                    labels = torch.zeros([1,1],dtype=pred_box.dtype,device=pred_box.device)
+                    confidence = torch.zeros([1,1],dtype=pred_box.dtype,device=pred_box.device)
+
+                else:
+                    pred_box = pred_box[keep]
+                    pred_cls = pred_cls[keep]
+                    confidence = confidence[keep]
+
+                    # labels and scores
+                    # scores, labels = torch.softmax(pred_cls, -1).max(dim=1)
+                    scores, labels = pred_cls.max(dim=1)
+
+                    # 过滤分类分数低的
+                    # keep = torch.nonzero(scores > self.threshold_cls).squeeze(1)
+                    keep = torch.nonzero(scores > self.threshold_cls)
+                    if len(keep)==0:
+                        pred_box = torch.zeros([1, 4], dtype=pred_box.dtype, device=pred_box.device)
+                        scores = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
+                        labels = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
+                        confidence = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
+                    else:
+                        pred_box, scores, labels, confidence = pred_box[keep], scores[keep], labels[keep], confidence[keep]
+
+                if len(result) < bs:
+                    result.append({"boxes": pred_box, "scores": scores, "labels": labels, "confidence": confidence})
+                    result[i].update(targets)
+                else:
+                    assert len(result) == bs, print("error")
+                    result[i]["boxes"] = torch.cat((result[i]["boxes"], pred_box), 0)
+                    result[i]["scores"] = torch.cat((result[i]["scores"], scores), 0)
+                    result[i]["labels"] = torch.cat((result[i]["labels"], labels), 0)
+                    result[i]["confidence"] = torch.cat((result[i]["confidence"], confidence), 0)
+
+        return result
+
+    def reverse_normalize(self,featureShape,boxes, target):
+        # [x0,y0,w,h]-->normalize 0~1--->[x1,y1,x2,y2]
+
+        h, w = target["resize"]
+        h_f, w_f = featureShape
+        strides_h = h // h_f
+        strides_w = w // w_f
+
+        # to 格网(x,y) 格式
+        temp = torch.arange(0, len(boxes))
+        grid_y = temp // w_f
+        grid_x = temp - grid_y * w_f
+
+        for j in range(self.num_anchors):
+            pw, ph = self.PreBoxSize[j]
+            pw *= (grid_ceil_w / self.PreFSize)
+            ph *= (grid_ceil_h / self.PreFSize)
+
+            x0 = boxes[:,j, 0] * strides_w + (grid_x * strides_w).float().to(self.device)
+            y0 = boxes[:,j, 1] * strides_h + (grid_y * strides_h).float().to(self.device)
+            w_b = torch.exp(boxes[:,j, 2]) * pw*strides_w
+            h_b = torch.exp(boxes[:,j, 3]) * ph*strides_h
+
+            x1 = x0 - w_b / 2.
+            y1 = y0 - h_b / 2.
+            x2 = x0 + w_b / 2.
+            y2 = y0 + h_b / 2.
+
+            # 裁剪到框内
+            x1 = x1.clamp(0,w)
+            x2 = x2.clamp(0,w)
+            y1 = y1.clamp(0,h)
+            y2 = y2.clamp(0,h)
+
+            boxes[:, j, 0] = x1
+            boxes[:, j, 1] = y1
+            boxes[:, j, 2] = x2
+            boxes[:, j, 3] = y2
+
+        return boxes
+
+
+def box_area(boxes):
+    """
+    Computes the area of a set of bounding boxes, which are specified by its
+    (x0, y0, x1, y1) coordinates.
+
+    Arguments:
+        boxes (Tensor[N, 4]): boxes for which the area will be computed. They
+            are expected to be in (x0, y0, x1, y1) format
+
+    Returns:
+        area (Tensor[N]): area for each box
+    """
+    return (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1])
+
+# implementation from https://github.com/kuangliu/torchcv/blob/master/torchcv/utils/box.py
+# with slight modifications
+def box_iou(boxes1, boxes2):
+    """
+    Return intersection-over-union (Jaccard index) of boxes.
+
+    Arguments:
+        boxes1 (Tensor[N, 4])
+        boxes2 (Tensor[M, 4])
+
+    Returns:
+        iou (Tensor[N, M]): the NxM matrix containing the pairwise
+            IoU values for every element in boxes1 and boxes2
+    """
+    area1 = box_area(boxes1)
+    area2 = box_area(boxes2)
+
+    lt = torch.max(boxes1[:, None, :2], boxes2[:, :2])  # [N,M,2]
+    rb = torch.min(boxes1[:, None, 2:], boxes2[:, 2:])  # [N,M,2]
+
+    wh = (rb - lt).clamp(min=0)  # [N,M,2]
+    inter = wh[:, :, 0] * wh[:, :, 1]  # [N,M]
+
+    iou = inter / (area1[:, None] + area2 - inter)
+    return iou

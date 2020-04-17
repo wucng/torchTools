@@ -50,6 +50,15 @@ class History():
 
         plt.show()
 
+    def show(self):
+        fig, ax = plt.subplots(1, 1, figsize=(15, 5))
+        ax[0].set_title("train loss")
+        for i,(k,v) in enumerate(self.history.items()):
+            # ax[0].set_title(k)
+            ax[0].plot(self.epoch,v,label=k)
+        ax[0].legend()
+        plt.show()
+
 class YOLOV1(nn.Module):
     def __init__(self,network=None,train_dataset=None,test_dataset=None,model_name="resnet18",num_features=None,
                  pretrained=False,dropRate=0.5, usize=256,isTrain=False,mulScale=False,
@@ -201,7 +210,8 @@ class YOLOV1(nn.Module):
 
             for key,value in loss_record.items():
                 loss_record[key] /= num_trains
-            return loss_record
+
+        return loss_record
 
     def test(self,nums=None):
         self.network.eval()

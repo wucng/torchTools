@@ -2,7 +2,7 @@
 #!pip install https://github.com/wucng/torchTools/archive/master.zip
 from torchTools.detection.run import yolov1
 from torchTools.detection.datasets import datasets, bboxAug
-from torchTools.detection.network import netSmall
+from torchTools.detection.network import netSmall,netLarger
 
 classes=["person"]
 testdataPath = "/kaggle/input/pennfudanped/PNGImages/"
@@ -46,6 +46,8 @@ model = yolov1.YOLOV1(network,train_dataset, test_dataset, "resnet18", pretraine
 
 
 model()
+
+model.history.show()
 
 model.test(5)
 ```

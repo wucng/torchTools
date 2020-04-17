@@ -9,9 +9,9 @@ import torchvision
 from collections import OrderedDict
 import numpy as np
 
-__all__ = ['Resnet', 'Mnasnet', 'Densenet',
-           'Alexnet','VGGnet','Squeezenet',
-           'Mobilenet','ShuffleNetV2']
+# __all__ = ['Resnet', 'Mnasnet', 'Densenet',
+#            'Alexnet','VGGnet','Squeezenet',
+#            'Mobilenet','ShuffleNetV2']
 
 class Flatten(nn.Module):
     def __init__(self):
@@ -90,6 +90,59 @@ class FPNNet(nn.Module):
                 nn.LeakyReLU(0.2)
             )
 
+            p = nn.Sequential(
+                nn.Conv2d(backbone_size//2**i, usize, 3, stride=1, padding=1),
+                nn.BatchNorm2d(usize),
+                # nn.ReLU()
+                nn.LeakyReLU(0.2)
+            )
+
+            if i>0:
+                upsample = nn.Sequential(
+                    nn.ConvTranspose2d(backbone_size//2**(i-1),backbone_size//2**i,3,2,1,1),
+                    nn.BatchNorm2d(backbone_size//2**i),
+                    nn.LeakyReLU(0.2),
+                )
+            else:
+                upsample = None
+
+            tmp = nn.ModuleList()
+            tmp.append(m)
+            tmp.append(p)
+            tmp.append(upsample)
+            self.net.append(tmp)
+
+    def forward(self, x_list):
+        x_list = x_list[::-1] # 反转
+        out = []
+        out_m = []
+        for i in range(self.num_features):
+            m,p,upsample=self.net[i]
+            m_x = m(x_list[i])
+            if i>0:
+                # m_x += F.interpolate(out_m[-1],scale_factor=(2,2))
+                m_x += upsample(out_m[-1])
+            p_x = p(m_x)
+
+            out.append(p_x)
+            out_m.append(m_x)
+
+        return out[::-1] # 反转
+
+class FPNNetLarger(nn.Module):
+    def __init__(self,backbone_size=2048,num_features=4, usize=256):
+        super(FPNNetLarger, self).__init__()
+        self.num_features = num_features
+
+        self.net = nn.ModuleList()
+        for i in range(num_features):
+            m = nn.Sequential(
+                nn.Conv2d(backbone_size//2**i, backbone_size//2**i, 1),
+                nn.BatchNorm2d(backbone_size//2**i),
+                # nn.ReLU()
+                nn.LeakyReLU(0.2)
+            )
+
             if i>0:
                 upsample = nn.Sequential(
                     nn.ConvTranspose2d(backbone_size//2**(i-1),backbone_size//2**i,3,2,1,1),
@@ -129,6 +182,43 @@ class FPNNet(nn.Module):
         # return out[::-1] # 反转
         return out_x[::-1] # 反转
 
+class FPNNetSmall(nn.Module):
+    def __init__(self,backbone_size=2048,num_features=4, usize=256):
+        super(FPNNetSmall, self).__init__()
+        self.num_features = num_features
+
+        self.net = nn.ModuleList()
+        for i in range(num_features):
+            m = nn.Sequential(
+                nn.Conv2d(backbone_size//2**i, usize, 1),
+                nn.BatchNorm2d(usize),
+                # nn.ReLU()
+                nn.LeakyReLU(0.2)
+            )
+
+            upsample = nn.Sequential(
+                nn.ConvTranspose2d(usize,usize,3,2,1,1),
+                nn.BatchNorm2d(usize),
+                nn.LeakyReLU(0.2),
+            )
+
+            tmp = nn.ModuleList()
+            tmp.append(m)
+            tmp.append(upsample)
+            self.net.append(tmp)
+
+    def forward(self, x_list):
+        x_list = x_list[::-1] # 反转
+        out = []
+        for i in range(self.num_features):
+            m,upsample=self.net[i]
+            m_x = m(x_list[i])
+            if i>0:
+                # m_x += F.interpolate(out_m[-1],scale_factor=(2,2))
+                m_x += upsample(out[-1])
+            out.append(m_x)
+
+        return out[::-1] # 反转
 
 class XNet(nn.Module):
     """
@@ -197,52 +287,3 @@ class XNet(nn.Module):
         new_out.append(outs[-1])
 
         return new_out
-
-class YOLOV1Net(nn.Module):
-    def __init__(self, num_classes=1, num_anchors=2, model_name="resnet101",num_features=None,
-                pretrained=False, dropRate=0.5, usize=256):
-        super(YOLOV1Net, self).__init__()
-        self.backbone = BackBoneNet(model_name,pretrained,dropRate)
-        self.num_features = self.backbone.num_features if num_features is None else num_features
-        self.fpn = FPNNet(self.backbone.backbone_size,self.num_features,usize)
-        # self.fpn = XNet(self.backbone.backbone_size,self.num_features,usize)
-        self.num_features = self.fpn.num_features
-        self.num_classes = num_classes
-        self.num_anchors = num_anchors
-
-        self.net = nn.ModuleList()
-        for i in range(self.num_features):
-            convp = nn.Sequential(
-                nn.Dropout(dropRate),
-                # nn.Conv2d(usize, usize, kernel_size=3, stride=1, padding=1),
-                # nn.BatchNorm2d(usize),
-                # nn.LeakyReLU(),
-                nn.Conv2d(usize, num_anchors * (5 + num_classes), kernel_size=3, stride=1, padding=1),
-                # 每个box对应一个类别
-                # 每个anchor对应4个坐标
-                nn.BatchNorm2d(num_anchors * (5 + num_classes)),
-                nn.Sigmoid()
-            )
-
-            self.net.append(convp)
-
-    def forward(self,x):
-        x_list = self.backbone(x)
-        p_x = self.fpn(x_list)
-        out = []
-        for i in range(self.num_features):
-            p = self.net[i](p_x[i])
-            p = p.permute(0, 2, 3, 1)  # (-1,7,7,30)
-
-            out.append(p)
-
-        return out # p1,p2,p3,p4
-
-
-
-
-if __name__ == "__main__":
-    net = YOLOV1Net(model_name="resnet18", usize=256,num_features=1)
-    x = torch.rand([5,3,224,224])
-    print(net(x)[0].shape)
-    # torch.save(net.state_dict(), "./model.pt")

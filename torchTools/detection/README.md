@@ -1,8 +1,8 @@
 ```py
 #!pip install https://github.com/wucng/torchTools/archive/master.zip
-from torchTools.detection.run import yolov1
+from torchTools.detection.run import yolo
 from torchTools.detection.datasets import datasets, bboxAug
-from torchTools.detection.network import netSmall,netLarger
+from torchTools.detection.network import yoloNet
 
 classes=["person"]
 testdataPath = "/kaggle/input/pennfudanped/PNGImages/"
@@ -10,7 +10,7 @@ traindataPath = "/kaggle/input/pennfudanped/"
 basePath = "/kaggle/working/"
 resize = (416,416)
 mulScale = False
-network = netSmall.YOLOV1Net
+# network = netSmall.YOLOV1Net
 
 train_transforms=bboxAug.Compose([
     # bboxAug.RandomChoice(),
@@ -39,10 +39,10 @@ test_transforms=bboxAug.Compose([
 train_dataset = datasets.PennFudanDataset(traindataPath,train_transforms,classes)
 test_dataset = datasets.ValidDataset(testdataPath,test_transforms)
 
-model = yolov1.YOLOV1(network,train_dataset, test_dataset, "resnet18", pretrained=True, num_features=1,
+model = yolo.YOLO(network,train_dataset, test_dataset, "resnet18", pretrained=True, num_features=1,
                    isTrain=True, num_anchors=2, epochs=400, print_freq=40,mulScale=mulScale,
                    basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=3e-3, batch_size=4,
-                   conf_thres=0.7, nms_thres=0.4, classes=classes,usize=256)
+                   conf_thres=0.7, nms_thres=0.4, classes=classes,usize=256,version="v1")
 
 
 model()

@@ -1,2 +1,1 @@
-from . import yolov1
-from . import yolov2
+from . import yolo

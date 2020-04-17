@@ -1,14 +1,14 @@
 try:
-    from ..network import net
-    from ..loss import loss
+    from ..network import yoloNet
+    from ..loss import yoloLoss
     from ..datasets import datasets, bboxAug
     from ..visual import opencv
     from ..optm import optimizer
 except:
     import sys
     sys.path.append("..")
-    from network import net
-    from loss import loss
+    from network import yoloNet
+    from loss import yoloLoss
     from datasets import datasets, bboxAug
     from visual import opencv
     from optm import optimizer
@@ -58,7 +58,7 @@ class History():
         ax.legend()
         plt.show()
 
-class YOLOV1(nn.Module):
+class YOLO(nn.Module):
     def __init__(self,trainDP=None,testDP=None,model_name="resnet18",num_features=None,
                  pretrained=False,dropRate=0.5, usize=256,isTrain=False,
                  basePath="./",save_model = "model.pt",summaryPath="yolov1_resnet50_416",
@@ -68,8 +68,8 @@ class YOLOV1(nn.Module):
                  typeOfData="PennFudanDataset",
                  threshold_conf=0.5,threshold_cls=0.5, #  # 0.05,0.5
                  conf_thres=0.5,nms_thres=0.4, # 0.8,0.4
-                 filter_labels = [],classes=[]):
-        super(YOLOV1,self).__init__()
+                 filter_labels = [],classes=[],version="v1"):# "v1" v2 v3
+        super(YOLO,self).__init__()
 
         self.batch_size = batch_size
         self.epochs = epochs
@@ -144,13 +144,19 @@ class YOLOV1(nn.Module):
                                           collate_fn=collate_fn, **kwargs)
 
 
-
-        self.loss_func = loss.YOLOv1Loss(self.device,num_anchors,num_classes,threshold_conf,
-                                         threshold_cls,conf_thres,nms_thres,filter_labels,self.mulScale)
-        self.network = net.YOLOV1Net(num_classes,num_anchors,model_name,num_features,pretrained,dropRate,usize)
-        # self.network.apply(net.weights_init)
-        self.network.fpn.apply(net.weights_init) # backbone 不使用
-        self.network.net.apply(net.weights_init)
+        if version=="v1":
+            self.loss_func = yoloLoss.YOLOv1Loss(self.device,num_anchors,num_classes,threshold_conf,
+                                             threshold_cls,conf_thres,nms_thres,filter_labels,self.mulScale)
+            self.network = yoloNet.YOLOV1Net(num_classes,num_anchors,model_name,num_features,pretrained,dropRate,usize)
+        elif version=="v2":
+            self.loss_func = yoloLoss.YOLOv2Loss(self.device, num_anchors, num_classes, threshold_conf,
+                                                 threshold_cls, conf_thres, nms_thres, filter_labels, self.mulScale)
+            self.network = yoloNet.YOLOV2Net(num_classes, num_anchors, model_name, num_features, pretrained, dropRate, usize)
+        else:
+            pass
+        # self.network.apply(yoloNet.weights_init)
+        self.network.fpn.apply(yoloNet.weights_init) # backbone 不使用
+        self.network.net.apply(yoloNet.weights_init)
 
         if self.use_cuda:
             self.network.to(self.device)
@@ -289,17 +295,17 @@ class YOLOV1(nn.Module):
                     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
                     image = self.draw_rect(image,pred)
 
-                    # cv2.imshow("test", image)
-                    # cv2.waitKey(0)
-                    # cv2.destroyAllWindows()
+                    cv2.imshow("test", image)
+                    cv2.waitKey(0)
+                    cv2.destroyAllWindows()
                     # plt.imshow(image)
                     # plt.show()
                     # PIL.Image.fromarray(image).show()
 
                     # save
-                    newPath = path.replace("PNGImages", "result")
-                    if not os.path.exists(os.path.dirname(newPath)): os.makedirs(os.path.dirname(newPath))
-                    cv2.imwrite(newPath, image)
+                    # newPath = path.replace("PNGImages", "result")
+                    # if not os.path.exists(os.path.dirname(newPath)): os.makedirs(os.path.dirname(newPath))
+                    # cv2.imwrite(newPath, image)
 
 
 
@@ -340,9 +346,9 @@ if __name__=="__main__":
     # """
 
     basePath = "./models/"
-    model = YOLOV1(traindataPath, testdataPath, "resnet18", pretrained=True, num_features=1,resize=(416,416),
-                   isTrain=False, num_anchors=2, mulScale=False, epochs=400, print_freq=40,dropRate=0.5,
+    model = YOLO(traindataPath, testdataPath, "resnet18", pretrained=True, num_features=1,resize=(416,416),
+                   isTrain=False, num_anchors=5, mulScale=False, epochs=400, print_freq=40,dropRate=0.5,
                    basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,
-                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=512)
+                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,version="v1")
 
     model()

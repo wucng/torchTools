@@ -1,14 +1,14 @@
 try:
-    from ..network import net
-    from ..loss import loss
+    from ..network import yoloNet
+    from ..loss import yoloLoss
     from ..datasets import datasets, bboxAug
     from ..visual import opencv
     from ..optm import optimizer
 except:
     import sys
     sys.path.append("..")
-    from network import net
-    from loss import loss
+    from network import yoloNet
+    from loss import yoloLoss
     from datasets import datasets, bboxAug
     from visual import opencv
     from optm import optimizer
@@ -35,6 +35,7 @@ def collate_fn(batch_data):
 
     return data_list,target_list
 
+
 class History():
     epoch = []
     history = {}
@@ -58,18 +59,16 @@ class History():
         ax.legend()
         plt.show()
 
-class YOLOV2(nn.Module):
-    def __init__(self,trainDP=None,testDP=None,model_name="resnet18",num_features=None,
-                 pretrained=False,dropRate=0.5, usize=256,isTrain=False,
+class YOLO(nn.Module):
+    def __init__(self,network=None,train_dataset=None,test_dataset=None,model_name="resnet18",num_features=None,
+                 pretrained=False,dropRate=0.5, usize=256,isTrain=False,mulScale=False,
                  basePath="./",save_model = "model.pt",summaryPath="yolov1_resnet50_416",
-                 epochs = 100,print_freq=1,resize:tuple = (224,224),
-                 mulScale=False,advanced=False,batch_size=2,num_anchors=2,lr=2e-3,
-                 # num_classes=20,
-                 typeOfData="PennFudanDataset",
+                 epochs = 100,print_freq=50,
+                 batch_size=2,num_anchors=2,lr=2e-3,
                  threshold_conf=0.5,threshold_cls=0.5, #  # 0.05,0.5
-                 conf_thres=0.5,nms_thres=0.4, # 0.8,0.4
-                 filter_labels = [],classes=[]):
-        super(YOLOV2,self).__init__()
+                 conf_thres=0.7,nms_thres=0.4, # 0.8,0.4
+                 filter_labels = [],classes=[],version="v1"):# "v1" v2 v3
+        super(YOLO,self).__init__()
 
         self.batch_size = batch_size
         self.epochs = epochs
@@ -86,71 +85,37 @@ class YOLOV2(nn.Module):
         torch.manual_seed(seed)
         kwargs = {'num_workers': 5, 'pin_memory': True} if self.use_cuda else {}
 
-        if self.isTrain:
-            if typeOfData=="PennFudanDataset":
-                Data = datasets.PennFudanDataset
-            elif typeOfData=="PascalVOCDataset":
-                Data = datasets.PascalVOCDataset
-            else:
-                pass
-            train_dataset = Data(trainDP,
-                      transforms=bboxAug.Compose([
-                          # bboxAug.RandomChoice(),
-                          bboxAug.Pad(), bboxAug.Resize(resize, mulScale),
-                          # *random.choice([
-                          #     [bboxAug.Pad(), bboxAug.Resize(resize, mulScale)],
-                          #     [bboxAug.Resize2(resize, mulScale)]
-                          # ]),
 
-                          # ---------两者取其一--------------------
-                          # bboxAug.RandomHorizontalFlip(),
-                          # bboxAug.RandomTranslate(),
-                          # # bboxAug.RandomRotate(3),
-                          # bboxAug.RandomBrightness(),
-                          # bboxAug.RandomSaturation(),
-                          # bboxAug.RandomHue(),
-                          # bboxAug.RandomBlur(),
-
-                          # bboxAug.Augment(advanced),
-                          # -------------------------------
-
-                          bboxAug.ToTensor(),  # PIL --> tensor
-                          bboxAug.Normalize() # tensor --> tensor
-                      ]),classes=classes)
-
-            test_dataset = datasets.ValidDataset(testDP,
-                                            transforms=bboxAug.Compose([
-                                                bboxAug.Pad(), bboxAug.Resize(resize, False),
-                                                bboxAug.ToTensor(),  # PIL --> tensor
-                                                bboxAug.Normalize()  # tensor --> tensor
-                                            ]))
-
+        if train_dataset is not None:
             self.train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
-                                          collate_fn=collate_fn, **kwargs)
-
+                                           collate_fn=collate_fn, **kwargs)
+        if test_dataset is not None:
             self.test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
                                           collate_fn=collate_fn, **kwargs)
 
+        if version=="v1":
+            self.loss_func = yoloLoss.YOLOv1Loss(self.device,num_anchors,num_classes,threshold_conf,
+                                         threshold_cls,conf_thres,nms_thres,filter_labels,self.mulScale)
+            if network is None:
+                self.network = yoloNet.YOLOV1Net(num_classes,num_anchors,model_name,num_features,pretrained,dropRate,usize)
+            else:
+                self.network = network(num_classes,num_anchors,model_name,num_features,pretrained,dropRate,usize)
+
+        elif version=="v2":
+            self.loss_func = yoloLoss.YOLOv2Loss(self.device, num_anchors, num_classes, threshold_conf,
+                                                 threshold_cls, conf_thres, nms_thres, filter_labels, self.mulScale)
+            if network is None:
+                self.network = yoloNet.YOLOV2Net(num_classes, num_anchors, model_name, num_features, pretrained,
+                                                 dropRate, usize)
+            else:
+                self.network = network(num_classes, num_anchors, model_name, num_features, pretrained, dropRate, usize)
 
         else:
-            test_dataset = datasets.ValidDataset(testDP,
-                      transforms=bboxAug.Compose([
-                          bboxAug.Pad(), bboxAug.Resize(resize, False),
-                          bboxAug.ToTensor(),  # PIL --> tensor
-                          bboxAug.Normalize() # tensor --> tensor
-                      ]))
+            pass
 
-            self.test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
-                                          collate_fn=collate_fn, **kwargs)
-
-
-
-        self.loss_func = loss.YOLOv2Loss(self.device,num_anchors,num_classes,threshold_conf,
-                                         threshold_cls,conf_thres,nms_thres,filter_labels,self.mulScale)
-        self.network = net.YOLOV2Net(num_classes,num_anchors,model_name,num_features,pretrained,dropRate,usize)
-        # self.network.apply(net.weights_init)
-        self.network.fpn.apply(net.weights_init) # backbone 不使用
-        self.network.net.apply(net.weights_init)
+        # self.network.apply(yoloNet.weights_init)
+        self.network.fpn.apply(yoloNet.weights_init) # backbone 不使用
+        self.network.net.apply(yoloNet.weights_init)
 
         if self.use_cuda:
             self.network.to(self.device)
@@ -182,25 +147,22 @@ class YOLOV2(nn.Module):
 
         self.writer = SummaryWriter(os.path.join(basePath,summaryPath))
 
-        self.history = History()
+        self.history= History()
 
     def forward(self):
         if self.isTrain:
             for epoch in range(self.epochs):
                 loss_record = self.train(epoch)
-                # if epoch>0 and epoch%30==0:
-                #     self.test(3)
                 # update the learning rate
                 self.lr_scheduler.step()
                 torch.save(self.network.state_dict(), self.save_model)
                 # torch.save(self.network.state_dict(), self.save_model+"_"+str(epoch))
 
                 self.history.epoch.append(epoch)
-                for key, value in loss_record.items():
+                for key,value in loss_record.items():
                     if key not in self.history.history:
                         self.history.history[key] = []
                     self.history.history[key].append(value)
-
         else:
             self.test()
 
@@ -210,7 +172,7 @@ class YOLOV2(nn.Module):
     def train(self,epoch):
         self.network.train()
         num_trains = len(self.train_loader.dataset)
-        loss_record = {}  # 记录每个epoch loss
+        loss_record = {} # 记录每个epoch loss
         for idx, (data, target) in enumerate(self.train_loader):
             if not self.mulScale:
                 data = torch.stack(data, 0)  # 不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
@@ -253,13 +215,13 @@ class YOLOV2(nn.Module):
             # 记录loss
             for key, loss in loss_dict.items():
                 if key not in loss_record:
-                    loss_record[key] = 0.0
-                loss_record[key] += loss.item()
+                    loss_record[key]=0.0
+                loss_record[key]+=loss.item()
             if "total" not in loss_record:
                 loss_record["total"] = 0.0
             loss_record["total"] += losses.item()
 
-            for key, value in loss_record.items():
+            for key,value in loss_record.items():
                 loss_record[key] /= num_trains
 
         return loss_record
@@ -286,22 +248,20 @@ class YOLOV2(nn.Module):
                     if pred is None:continue
                     path = target[i]["path"]
                     image = np.asarray(PIL.Image.open(path).convert("RGB"), np.uint8)
-                    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+                    # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
                     image = self.draw_rect(image,pred)
 
                     # cv2.imshow("test", image)
                     # cv2.waitKey(0)
                     # cv2.destroyAllWindows()
-                    # plt.imshow(image)
-                    # plt.show()
+                    plt.imshow(image)
+                    plt.show()
                     # PIL.Image.fromarray(image).show()
 
                     # save
-                    newPath = path.replace("PNGImages", "result")
-                    if not os.path.exists(os.path.dirname(newPath)): os.makedirs(os.path.dirname(newPath))
-                    cv2.imwrite(newPath, image)
-
-
+                    # newPath = path.replace("PNGImages", "result")
+                    # if not os.path.exists(os.path.dirname(newPath)): os.makedirs(os.path.dirname(newPath))
+                    # cv2.imwrite(newPath, image)
 
     def predict(self):
         pass
@@ -320,29 +280,3 @@ class YOLOV2(nn.Module):
 
             image=opencv.vis_rect(image,pos,class_str,0.5,int(label))
         return image
-
-
-if __name__=="__main__":
-    # """
-    classes = ["person"]
-    # testdataPath = "/home/wucong/practise/datas/valid/PNGImages/"
-    # traindataPath = "/home/wucong/practise/datas/PennFudanPed/"
-    # testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
-    # traindataPath = "D:/practice/datas/PennFudanPed/"
-    testdataPath = r"C:\practice\data\PennFudanPed\PNGImages"
-    traindataPath = r"C:\practice\data\PennFudanPed"
-    typeOfData = "PennFudanDataset"
-    """
-    classes = ["bicycle", "bus", "car", "motorbike", "person"]
-    testdataPath = "/home/wucong/practise/datas/valid/PNGImages/"
-    traindataPath = "/home/wucong/practise/datas/VOCdevkit/"
-    typeOfData = "PascalVOCDataset"
-    # """
-
-    basePath = "./models/"
-    model = YOLOV2(traindataPath, testdataPath, "resnet18", pretrained=False, num_features=1,resize=(224,224),
-                   isTrain=True, num_anchors=5, mulScale=False, epochs=400, print_freq=40,dropRate=0.5,
-                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,
-                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256)
-
-    model()

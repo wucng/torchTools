@@ -546,7 +546,7 @@ class YOLOv2Loss(YOLOv1Loss):
 
             for i in range(bs):
                 targets = targets_origin[i]
-                pred_box = preds[i, :,: :4]
+                pred_box = preds[i, :,:,:4]
                 pred_conf = preds[i, :,:, 4].contiguous().view(-1)
                 pred_cls = preds[i, :,:, 5:].contiguous().view(-1,self.num_classes)  # *pred_conf # # 推理时做 p_cls*confidence
 
@@ -612,8 +612,8 @@ class YOLOv2Loss(YOLOv1Loss):
 
         for j in range(self.num_anchors):
             pw, ph = self.PreBoxSize[j]
-            pw *= (grid_ceil_w / self.PreFSize)
-            ph *= (grid_ceil_h / self.PreFSize)
+            pw *= (w_f / self.PreFSize)
+            ph *= (h_f / self.PreFSize)
 
             x0 = boxes[:,j, 0] * strides_w + (grid_x * strides_w).float().to(self.device)
             y0 = boxes[:,j, 1] * strides_h + (grid_y * strides_h).float().to(self.device)

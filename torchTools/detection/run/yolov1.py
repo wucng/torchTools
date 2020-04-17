@@ -35,6 +35,21 @@ def collate_fn(batch_data):
 
     return data_list,target_list
 
+
+class History():
+    epoch = []
+    history = {}
+
+    # 打印训练结果信息
+    def show_final_history(self):
+        fig, ax = plt.subplots(1, len(self.history), figsize=(15, 5))
+        for i,(k,v) in enumerate(self.history.items()):
+            ax[i].set_title(k)
+            ax[i].plot(self.epoch,v,label=k)
+            ax[i].legend()
+
+        plt.show()
+
 class YOLOV1(nn.Module):
     def __init__(self,network=None,train_dataset=None,test_dataset=None,model_name="resnet18",num_features=None,
                  pretrained=False,dropRate=0.5, usize=256,isTrain=False,mulScale=False,
@@ -110,14 +125,22 @@ class YOLOV1(nn.Module):
 
         self.writer = SummaryWriter(os.path.join(basePath,summaryPath))
 
+        self.history= History()
+
     def forward(self):
         if self.isTrain:
             for epoch in range(self.epochs):
-                self.train(epoch)
+                loss_record = self.train(epoch)
                 # update the learning rate
                 self.lr_scheduler.step()
                 torch.save(self.network.state_dict(), self.save_model)
                 # torch.save(self.network.state_dict(), self.save_model+"_"+str(epoch))
+
+                self.history.epoch.append(epoch)
+                for key,value in loss_record.items():
+                    if key not in self.history.history:
+                        self.history.history[key] = []
+                    self.history.history[key].append(value)
         else:
             self.test()
 
@@ -127,6 +150,7 @@ class YOLOV1(nn.Module):
     def train(self,epoch):
         self.network.train()
         num_trains = len(self.train_loader.dataset)
+        loss_record = {} # 记录每个epoch loss
         for idx, (data, target) in enumerate(self.train_loader):
             if not self.mulScale:
                 data = torch.stack(data, 0)  # 不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
@@ -165,6 +189,19 @@ class YOLOV1(nn.Module):
                     ss += "\t{}:{:.3f}".format(key, loss.item())
 
                 print(ss)
+
+            # 记录loss
+            for key, loss in loss_dict.items():
+                if key not in loss_record:
+                    loss_record[key]=0.0
+                loss_record[key]+=loss.item()
+            if "total" not in loss_record:
+                loss_record["total"] = 0.0
+            loss_record["total"] += losses.item()
+
+            for key,value in loss_record.items():
+                loss_record[key] /= num_trains
+            return loss_record
 
     def test(self,nums=None):
         self.network.eval()

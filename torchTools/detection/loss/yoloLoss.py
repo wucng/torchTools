@@ -373,8 +373,8 @@ class YOLOv2Loss(YOLOv1Loss):
     VOC: (1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053), (11.2364, 10.0071)
     """
     # w,h
-    # PreBoxSize = [(1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053), (11.2364, 10.0071)]
-    # PreFSize = 416//32
+    PreBoxSize = [(1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053), (11.2364, 10.0071)]
+    PreFSize = 416//32
     # PreStride = 32
     # PreSize = 416
 
@@ -390,12 +390,25 @@ class YOLOv2Loss(YOLOv1Loss):
                                         num_classes,threshold_conf,threshold_cls,
                                         conf_thres,nms_thres,filter_labels,mulScale)
 
-        self.PreBoxSize = [(1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053), (11.2364, 10.0071)]
+        self.PreBoxSize = [(1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053),
+                           (11.2364, 10.0071)]
         self.PreFSize = 416 // 32
 
-        assert num_anchors==len(self.PreBoxSize),print("num_anchors:%d not equal num of PreBoxSize"%(num_anchors))
+        # assert num_anchors==len(self.PreBoxSize),print("num_anchors:%d not equal num of PreBoxSize"%(num_anchors))
 
-    def compute_loss(self,preds_list, targets_origin,useFocal=False,alpha=1.0,gamma=2):
+    def forward(self,preds,targets,lossfunc="v2"):
+        if "boxes" not in targets[0]:
+            # return self.predict(preds,targets)
+            results = self.predict(preds,targets)
+            results = [self.apply_nms(result) for result in results]
+            return results
+        else:
+            if lossfunc=="v1": # 类似于 yolov1的方式
+                return self.compute_loss2(preds, targets,useFocal=True)
+            else:
+                return self.compute_loss(preds, targets,useFocal=True)
+
+    def compute_loss2(self,preds_list, targets_origin,useFocal=False,alpha=1.0,gamma=2):
         """
         :param preds:
                 if mulScale: # 使用多尺度（2个特征为例,batch=2）
@@ -425,7 +438,7 @@ class YOLOv2Loss(YOLOv1Loss):
             for i, preds in enumerate(pred_list):
                 fh, fw = preds.shape[1:-1]
                 # normalize
-                targets = self.normalize((fh, fw), target_origin)
+                targets = self.normalize2((fh, fw), target_origin)
 
                 # preds = preds.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
                 # targets = targets.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
@@ -534,6 +547,89 @@ class YOLOv2Loss(YOLOv1Loss):
 
         return result
 
+    def compute_loss(self,preds_list, targets_origin,useFocal=False,alpha=1.0,gamma=2):
+        """
+        :param preds:
+                if mulScale: # 使用多尺度（2个特征为例,batch=2）
+                    preds=[[(1,28,28,12),(1,14,14,12)],[(1,28,28,12),(1,14,14,12)]]
+                else: #（2个特征为例,batch=2）
+                   preds=[(2,28,28,12),(2,14,14,12)]
+        :param targets:
+                [{"boxes":(n,4),"labels":(n,)},{"boxes":(m,4),"labels":(m,)}]
+        :return:
+        """
+        losses = {
+            "loss_conf": 0,
+            "loss_no_conf": 0,
+            "loss_box": 0,
+            "loss_clf": 0,
+            "loss_no_clf": 0,
+            # "iou_loss": iou_loss
+        }
+
+        for jj in range(len(targets_origin)):
+            target_origin = targets_origin[jj]
+            if self.mulScale:
+                pred_list = preds_list[jj]
+            else:
+                pred_list =[pred[jj].unsqueeze(0) for pred in preds_list]
+
+            for i, preds in enumerate(pred_list):
+                fh, fw = preds.shape[1:-1]
+                # normalize
+                targets,noobj_mask = self.normalize((fh, fw), target_origin)
+
+                # preds = preds.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
+                # targets = targets.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
+
+                preds = preds.contiguous().view(-1,5 + self.num_classes)
+                targets = targets.contiguous().view(-1, 5 + self.num_classes)
+                noobj_mask = noobj_mask.contiguous().view(-1)
+
+                index = targets[..., 4] == 1
+                # no_index = targets[..., 4] != 1
+                no_index = noobj_mask == 1
+                has_obj = preds[index]
+                no_obj = preds[no_index]
+                targ_obj = targets[index]
+
+                loss_conf = F.binary_cross_entropy(has_obj[..., 4], torch.ones_like(has_obj[..., 4]).detach(),
+                                                   reduction="sum")  # 对应目标
+
+                loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
+                                                      reduction="sum")  # 对应背景
+                # boxes loss
+                # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
+                # loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
+                loss_box_x = F.binary_cross_entropy(has_obj[..., 0], targ_obj[..., 0].detach(), reduction="sum")
+                loss_box_y = F.binary_cross_entropy(has_obj[..., 1], targ_obj[..., 1].detach(), reduction="sum")
+                loss_box_wh = F.mse_loss(has_obj[..., 2:4], targ_obj[..., 2:4].detach(), reduction="sum")
+                loss_box = loss_box_x+loss_box_y+loss_box_wh
+
+                # classify loss
+                # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                # loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
+                loss_clf = F.binary_cross_entropy(has_obj[..., 5:], targ_obj[..., 5:], reduction="sum")
+
+                # no obj classify loss
+                loss_no_clf = F.mse_loss(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
+
+                if useFocal:
+                    loss_conf = alpha * (1 - torch.exp(-loss_conf)) ** gamma * loss_conf
+                    loss_no_conf = alpha * (1 - torch.exp(-loss_no_conf)) ** gamma * loss_no_conf
+                    # loss_box = alpha * (1 - torch.exp(-loss_box)) ** gamma * loss_box
+                    loss_clf = alpha * (1 - torch.exp(-loss_clf)) ** gamma * loss_clf
+                    loss_no_clf = alpha * (1 - torch.exp(-loss_no_clf)) ** gamma * loss_no_clf
+
+
+                losses["loss_conf"] += loss_conf
+                losses["loss_no_conf"] += loss_no_conf * 0.05  # 0.05
+                losses["loss_box"] += loss_box * 50.  # 50
+                losses["loss_clf"] += loss_clf
+                losses["loss_no_clf"] += loss_no_clf * 0.05
+
+        return losses
+
     def normalize(self, featureShape, target):
         """加入按IOU筛选最好的anchor"""
         grid_ceil_h, grid_ceil_w = featureShape
@@ -547,6 +643,8 @@ class YOLOv2Loss(YOLOv1Loss):
                               self.num_anchors, 5 + self.num_classes],
                              dtype=boxes.dtype,
                              device=boxes.device)
+
+        noobj_mask = torch.ones([1,grid_ceil_h, grid_ceil_w,self.num_anchors,1],dtype=torch.long,device=boxes.device)
 
         # for idx, (box, label) in enumerate(zip(boxes, labels)):
         idx = 0
@@ -577,18 +675,21 @@ class YOLOv2Loss(YOLOv1Loss):
 
         # 找到与哪个先验框的IOU最大
         gt_boxes = torch.stack((w_b,h_b),1)
-        anchors = torch.as_tensor(self.PreBoxSize, device=self.device)
+        anchors = torch.as_tensor(self.PreBoxSize, device=self.device,dtype=boxes.dtype)
         temp_anchors = torch.cat((torch.zeros_like(anchors), anchors), -1)
         temp_gt_boxes = torch.cat((torch.zeros_like(gt_boxes), gt_boxes), -1)
 
         # IOU阈值
-        # iou_thres = 0.5
+        iou_thres = 0.5
 
         for i, (y, x) in enumerate(zip(grid_ceil[1], grid_ceil[0])):
             # 按IOU筛选最好的anchor
             iou = box_iou(temp_anchors, temp_gt_boxes[i][None,:])
             best_iou, best_anchor = iou.max(dim=0)
 
+            noobj_mask[idx,y,x,torch.nonzero(iou>iou_thres)[:,0],0] = 0 # 忽略 ,是目标而不是背景
+
+            # if best_iou > 0:
             # 计算对应先念框的 h与w
             pw, ph = self.PreBoxSize[best_anchor]
             pw *= (grid_ceil_w / self.PreFSize)
@@ -601,7 +702,7 @@ class YOLOv2Loss(YOLOv1Loss):
             result[idx, y, x, best_anchor, 4] = 1  # 置信度
             result[idx, y, x, best_anchor, 5 + int(label[i])] = 1  # 转成one-hot
 
-        return result
+        return result,noobj_mask
 
     def reverse_normalize(self,featureShape,boxes, target):
         # [x0,y0,w,h]-->normalize 0~1--->[x1,y1,x2,y2]

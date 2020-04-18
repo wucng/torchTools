@@ -78,6 +78,12 @@ class YOLO(nn.Module):
         self.mulScale = mulScale
         self.classes = classes
         num_classes = len(self.classes)
+        if version=='v2':
+            num_anchors = 5
+        elif version=='v3':
+            num_anchors = 3
+        else:
+            pass
 
         # seed = 100
         seed = int(time.time() * 1000)
@@ -382,9 +388,9 @@ if __name__=="__main__":
     # """
 
     basePath = "./models/"
-    model = YOLO(traindataPath, testdataPath, "resnet18", pretrained=False, num_features=1,resize=(416,416),
-                   isTrain=False, num_anchors=5, mulScale=False, epochs=400, print_freq=40,dropRate=0.5,
+    model = YOLO(traindataPath, testdataPath, "resnet18", pretrained=False, num_features=1,resize=(112,112),
+                   isTrain=True, num_anchors=3, mulScale=False, epochs=400, print_freq=40,dropRate=0.5,
                    basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,
-                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,version="v2")
+                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,version="v3")
 
     model()

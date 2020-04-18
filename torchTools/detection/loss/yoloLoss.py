@@ -455,7 +455,7 @@ class YOLOv2Loss(YOLOv1Loss):
                 # classify loss
                 # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
                 # loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
-                loss_clf = F.binary_cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
+                loss_clf = F.binary_cross_entropy(has_obj[..., 5:], targ_obj[..., 5:], reduction="sum")
 
                 # no obj classify loss
                 loss_no_clf = F.mse_loss(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")

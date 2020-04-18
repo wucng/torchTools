@@ -182,36 +182,19 @@ class YOLOv1Loss(nn.Module):
 
         for idx, preds in enumerate(preds_list):
             bs, fh, fw = preds.shape[:-1]
-            preds = preds.contiguous().view(-1, self.num_anchors, 5 + self.num_classes)
-            # preds = preds.contiguous().view(bs,fh,fw,self.num_anchors,5 + self.num_classes)
-            # 选择置信度最高的对应box(多个box时)
-            # new_preds = torch.zeros_like(preds)[:, 0, :]
-            # for i, p in enumerate(preds):
-                # conf
-                # if p[0, 4] * p[0, 5] > p[1, 4] * p[1, 5]:
-                # if p[0, 4] > p[1, 4]:
-                #     new_preds[i] = preds[i, 0, :]
-                # else:
-                #     new_preds[i] = preds[i, 1, :]
-                # new_preds[i]=preds[i, p[:,4].argmax(), :]
-                # new_preds[i]=preds[i, p[:,5:].max(-1)[1], :]
-                # new_preds[i]=preds[i, (p[:,4]*p[:,5:].max(-1)[0]).argmax(), :]
-
-            # new_preds = preds[:, preds[:, :, 4].max(1)[1], :][:, 0, :]
-            # new_preds = preds[:, preds[:, :, 5:].max(-1)[0].max(1)[1], :][:, 0, :]
-            new_preds = preds[:, (preds[:, :, 4]*preds[:, :, 5:].max(-1)[0]).max(1)[1], :][:, 0, :]
-
-
-            preds = new_preds.contiguous().view(bs, -1, 5 + self.num_classes)
+            preds = preds.contiguous().view(bs,-1, self.num_anchors, 5 + self.num_classes)
 
             for i in range(bs):
                 targets = targets_origin[i]
-                pred_box = preds[i, :, :4]
-                pred_conf = preds[i, :, 4]
-                pred_cls = preds[i, :, 5:]  # *pred_conf # # 推理时做 p_cls*confidence
+                new_preds = preds[i]
+                new_preds[...,:4] = self.reverse_normalize((fh, fw), new_preds[...,:4], targets)
+                new_preds = new_preds[:, (new_preds[:, :, 4] * new_preds[:, :, 5:].max(-1)[0]).max(1)[1], :][:, 0, :]
+                # new_preds = new_preds[:, new_preds[:, :, 4].max(1)[1], :][:, 0, :]
+                # new_preds = new_preds[:, new_preds[:, :, 5:].max(-1)[0].max(1)[1], :][:, 0, :]
 
-                # 转成x1,y1,x2,y2
-                pred_box = self.reverse_normalize((fh, fw), pred_box,targets)
+                pred_box = new_preds[:,:4]
+                pred_conf = new_preds[:, 4]
+                pred_cls = new_preds[:, 5:]
 
                 # pred_box = clip_boxes_to_image(pred_box, input_img[0].size()[-2:])  # 裁剪到图像内
                 # # 过滤尺寸很小的框
@@ -219,6 +202,7 @@ class YOLOv1Loss(nn.Module):
                 # pred_box = pred_box[keep]
                 # pred_cls = pred_cls[keep]
                 # confidence = pred_conf[keep]#.squeeze(1)
+
 
                 confidence = pred_conf
 
@@ -279,23 +263,29 @@ class YOLOv1Loss(nn.Module):
         grid_y = temp // w_f
         grid_x = temp - grid_y * w_f
 
-        x0 = boxes[:, 0] * strides_w + (grid_x * strides_w).float().to(self.device)
-        y0 = boxes[:, 1] * strides_h + (grid_y * strides_h).float().to(self.device)
-        w_b = boxes[:, 2] * w
-        h_b = boxes[:, 3] * h
+        for j in range(self.num_anchors):
+            x0 = boxes[:,j, 0] * strides_w + (grid_x * strides_w).float().to(self.device)
+            y0 = boxes[:,j, 1] * strides_h + (grid_y * strides_h).float().to(self.device)
+            w_b = boxes[:,j, 2] * w
+            h_b = boxes[:,j, 3] * h
 
-        x1 = x0 - w_b / 2.
-        y1 = y0 - h_b / 2.
-        x2 = x0 + w_b / 2.
-        y2 = y0 + h_b / 2.
+            x1 = x0 - w_b / 2.
+            y1 = y0 - h_b / 2.
+            x2 = x0 + w_b / 2.
+            y2 = y0 + h_b / 2.
 
-        # 裁剪到框内
-        x1 = x1.clamp(0,w)
-        x2 = x2.clamp(0,w)
-        y1 = y1.clamp(0,h)
-        y2 = y2.clamp(0,h)
+            # 裁剪到框内
+            x1 = x1.clamp(0,w)
+            x2 = x2.clamp(0,w)
+            y1 = y1.clamp(0,h)
+            y2 = y2.clamp(0,h)
 
-        return torch.stack((x1, y1, x2, y2), dim=0).t()
+            boxes[:, j, 0] = x1
+            boxes[:, j, 1] = y1
+            boxes[:, j, 2] = x2
+            boxes[:, j, 3] = y2
+
+        return boxes
 
     def apply_nms(self,prediction):
         # for idx,prediction in enumerate(detections):
@@ -486,7 +476,7 @@ class YOLOv2Loss(YOLOv1Loss):
 
         return losses
 
-    def normalize(self, featureShape, target):
+    def normalize2(self, featureShape, target):
         """不做筛选所有的anchor都参与计算"""
         grid_ceil_h, grid_ceil_w = featureShape
         h, w = target["resize"]
@@ -544,7 +534,7 @@ class YOLOv2Loss(YOLOv1Loss):
 
         return result
 
-    def normalize2(self, featureShape, target):
+    def normalize(self, featureShape, target):
         """加入按IOU筛选最好的anchor"""
         grid_ceil_h, grid_ceil_w = featureShape
         h, w = target["resize"]
@@ -610,75 +600,6 @@ class YOLOv2Loss(YOLOv1Loss):
             result[idx, y, x, best_anchor, 3] = torch.log(h_b[i]/ph)
             result[idx, y, x, best_anchor, 4] = 1  # 置信度
             result[idx, y, x, best_anchor, 5 + int(label[i])] = 1  # 转成one-hot
-
-        return result
-
-    def predict(self, preds_list,targets_origin):
-        """
-        :param preds_list:
-                   #（2个特征为例,batch=2）
-                   preds_list=[(2,28,28,12),(2,14,14,12)]
-        :param targets_origin:
-                  [{"resize":(h,w),"origin_size":(h,w)},{"resize":(h,w),"origin_size":(h,w)}]
-        :return:
-        """
-        result = []
-
-        for idx, preds in enumerate(preds_list):
-            bs, fh, fw = preds.shape[:-1]
-            preds = preds.contiguous().view(bs,-1, self.num_anchors, 5 + self.num_classes)
-
-            for i in range(bs):
-                targets = targets_origin[i]
-                new_preds = preds[i]
-                new_preds[...,:4] = self.reverse_normalize((fh, fw), new_preds[...,:4], targets)
-                new_preds = new_preds[:, (new_preds[:, :, 4] * new_preds[:, :, 5:].max(-1)[0]).max(1)[1], :][:, 0, :]
-
-                pred_box = new_preds[:,:4]
-                pred_conf = new_preds[:, 4]
-                pred_cls = new_preds[:, 5:]
-
-                confidence = pred_conf
-
-                condition = confidence > self.threshold_conf
-
-                keep = torch.nonzero(condition).squeeze(1)
-
-                if len(keep)==0:
-                    pred_box = torch.zeros([1,4],dtype=pred_box.dtype,device=pred_box.device)
-                    scores = torch.zeros([1,1],dtype=pred_box.dtype,device=pred_box.device)
-                    labels = torch.zeros([1,1],dtype=pred_box.dtype,device=pred_box.device)
-                    confidence = torch.zeros([1,1],dtype=pred_box.dtype,device=pred_box.device)
-
-                else:
-                    pred_box = pred_box[keep]
-                    pred_cls = pred_cls[keep]
-                    confidence = confidence[keep]
-
-                    # labels and scores
-                    # scores, labels = torch.softmax(pred_cls, -1).max(dim=1)
-                    scores, labels = pred_cls.max(dim=1)
-
-                    # 过滤分类分数低的
-                    # keep = torch.nonzero(scores > self.threshold_cls).squeeze(1)
-                    keep = torch.nonzero(scores > self.threshold_cls)
-                    if len(keep)==0:
-                        pred_box = torch.zeros([1, 4], dtype=pred_box.dtype, device=pred_box.device)
-                        scores = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
-                        labels = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
-                        confidence = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
-                    else:
-                        pred_box, scores, labels, confidence = pred_box[keep], scores[keep], labels[keep], confidence[keep]
-
-                if len(result) < bs:
-                    result.append({"boxes": pred_box, "scores": scores, "labels": labels, "confidence": confidence})
-                    result[i].update(targets)
-                else:
-                    assert len(result) == bs, print("error")
-                    result[i]["boxes"] = torch.cat((result[i]["boxes"], pred_box), 0)
-                    result[i]["scores"] = torch.cat((result[i]["scores"], scores), 0)
-                    result[i]["labels"] = torch.cat((result[i]["labels"], labels), 0)
-                    result[i]["confidence"] = torch.cat((result[i]["confidence"], confidence), 0)
 
         return result
 

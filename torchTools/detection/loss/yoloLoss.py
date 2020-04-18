@@ -401,7 +401,7 @@ class YOLOv2Loss(YOLOv1Loss):
         self.mse_loss = nn.MSELoss(reduction='sum')
         self.bce_loss = nn.BCELoss(reduction='sum')
 
-    def forward(self,preds,targets,lossfunc="v1"):
+    def forward(self,preds,targets,lossfunc="v3"):
         if "boxes" not in targets[0]:
             # return self.predict(preds,targets)
             results = self.predict(preds,targets)
@@ -410,8 +410,10 @@ class YOLOv2Loss(YOLOv1Loss):
         else:
             if lossfunc=="v1": # 类似于 yolov1的方式
                 return self.compute_loss(preds, targets,useFocal=True)
-            else:
+            elif lossfunc=="v2": # 没有效果
                 return self.compute_loss2(preds, targets,useFocal=True)
+            else:
+                return self.compute_loss3(preds, targets, useFocal=True)
 
 
     def normalize(self, featureShape, target):
@@ -633,6 +635,155 @@ class YOLOv2Loss(YOLOv1Loss):
             result[idx, y, x, best_anchor, 5 + int(label[i])] = 1  # 转成one-hot
 
         return result,noobj_mask
+
+
+    def compute_loss3(self,preds_list, targets_origin,useFocal=False,alpha=1.0,gamma=2):
+        """
+        :param preds:
+                if mulScale: # 使用多尺度（2个特征为例,batch=2）
+                    preds=[[(1,28,28,12),(1,14,14,12)],[(1,28,28,12),(1,14,14,12)]]
+                else: #（2个特征为例,batch=2）
+                   preds=[(2,28,28,12),(2,14,14,12)]
+        :param targets:
+                [{"boxes":(n,4),"labels":(n,)},{"boxes":(m,4),"labels":(m,)}]
+        :return:
+        """
+        losses = {
+            "loss_conf": 0,
+            "loss_no_conf": 0,
+            "loss_box": 0,
+            "loss_clf": 0,
+            "loss_no_clf": 0,
+            # "iou_loss": iou_loss
+        }
+
+        for jj in range(len(targets_origin)):
+            target_origin = targets_origin[jj]
+            if self.mulScale:
+                pred_list = preds_list[jj]
+            else:
+                pred_list =[pred[jj].unsqueeze(0) for pred in preds_list]
+
+            for i, preds in enumerate(pred_list):
+                fh, fw = preds.shape[1:-1]
+                # normalize
+                targets = self.normalize3((fh, fw), target_origin)
+
+                # preds = preds.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
+                # targets = targets.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
+
+                preds = preds.contiguous().view(-1,5 + self.num_classes)
+                targets = targets.contiguous().view(-1, 5 + self.num_classes)
+
+                index = targets[..., 4] == 1
+                no_index = targets[..., 4] != 1
+                has_obj = preds[index]
+                no_obj = preds[no_index]
+                targ_obj = targets[index]
+
+                loss_conf = self.bce_loss(has_obj[..., 4], torch.ones_like(has_obj[..., 4]).detach())  # 对应目标
+
+                loss_no_conf = self.bce_loss(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach())  # 对应背景
+                # boxes loss
+                loss_box = self.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach())
+                # loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
+
+                # classify loss
+                # loss_clf = self.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach())
+                loss_clf = self.bce_loss(has_obj[..., 5:], targ_obj[..., 5:].detach())
+                # loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
+
+                # no obj classify loss
+                loss_no_clf = self.mse_loss(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach())
+                # loss_no_clf = F.binary_cross_entropy(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
+
+                if useFocal:
+                    loss_conf = alpha * (1 - torch.exp(-loss_conf)) ** gamma * loss_conf
+                    loss_no_conf = alpha * (1 - torch.exp(-loss_no_conf)) ** gamma * loss_no_conf
+                    # loss_box = alpha * (1 - torch.exp(-loss_box)) ** gamma * loss_box
+                    loss_clf = alpha * (1 - torch.exp(-loss_clf)) ** gamma * loss_clf
+                    loss_no_clf = alpha * (1 - torch.exp(-loss_no_clf)) ** gamma * loss_no_clf
+
+
+                losses["loss_conf"] += loss_conf
+                losses["loss_no_conf"] += loss_no_conf * 0.05  # 0.05
+                losses["loss_box"] += loss_box * 50.  # 50
+                losses["loss_clf"] += loss_clf
+                losses["loss_no_clf"] += loss_no_clf * 0.05
+
+        return losses
+
+    def normalize3(self, featureShape, target):
+        """加入按IOU筛选最好的anchor"""
+        grid_ceil_h, grid_ceil_w = featureShape
+        h, w = target["resize"]
+        boxes = target["boxes"]
+        labels = target["labels"]
+        strides_h = h // grid_ceil_h
+        strides_w = w // grid_ceil_w
+
+        result = torch.zeros([1, grid_ceil_h, grid_ceil_w,  # len(labels)
+                              self.num_anchors, 5 + self.num_classes],
+                             dtype=boxes.dtype,
+                             device=boxes.device)
+
+
+        # for idx, (box, label) in enumerate(zip(boxes, labels)):
+        idx = 0
+        box = boxes
+        label = labels
+        # x1,y1,x2,y2->x0,y0,w,h
+        x1 = box[:, 0]
+        y1 = box[:, 1]
+        x2 = box[:, 2]
+        y2 = box[:, 3]
+
+        # [x0,y0,w,h]
+        x0 = (x1 + x2) / 2.
+        y0 = (y1 + y2) / 2.
+        # w_b = (x2 - x1) / w  # 0~1
+        # h_b = (y2 - y1) / h  # 0~1
+        w_b = (x2 - x1) / strides_w
+        h_b = (y2 - y1) / strides_h
+
+        # 判断box落在哪个grid ceil
+        # 取格网左上角坐标
+        grid_ceil = ((x0 / strides_w).int(), (y0 / strides_h).int())
+
+        # normal 0~1
+        # gt_box 中心点坐标-对应grid cell左上角的坐标/ 格网大小使得范围变成0到1
+        x0 = (x0 - grid_ceil[0].float() * strides_w) / strides_w
+        y0 = (y0 - grid_ceil[1].float() * strides_h) / strides_h
+
+        # 找到与哪个先验框的IOU最大
+        gt_boxes = torch.stack((w_b,h_b),1)
+        anchors = torch.as_tensor(self.PreBoxSize, device=self.device,dtype=boxes.dtype)
+        temp_anchors = torch.cat((torch.zeros_like(anchors), anchors), -1)
+        temp_gt_boxes = torch.cat((torch.zeros_like(gt_boxes), gt_boxes), -1)
+
+        # IOU阈值
+        # iou_thres = 0.5
+
+        for i, (y, x) in enumerate(zip(grid_ceil[1], grid_ceil[0])):
+            # 按IOU筛选最好的anchor
+            iou = box_iou(temp_anchors, temp_gt_boxes[i][None,:])
+            best_iou, best_anchor = iou.max(dim=0)
+
+            # if best_iou > 0:
+            # 计算对应先念框的 h与w
+            pw, ph = self.PreBoxSize[best_anchor]
+            pw *= (grid_ceil_w / self.PreFSize)
+            ph *= (grid_ceil_h / self.PreFSize)
+
+            result[idx, y, x, best_anchor, 0] = x0[i]
+            result[idx, y, x, best_anchor, 1] = y0[i]
+            result[idx, y, x, best_anchor, 2] = torch.log(w_b[i]/pw)
+            result[idx, y, x, best_anchor, 3] = torch.log(h_b[i]/ph)
+            result[idx, y, x, best_anchor, 4] = 1  # 置信度
+            result[idx, y, x, best_anchor, 5 + int(label[i])] = 1  # 转成one-hot
+
+        return result
+
 
     def reverse_normalize(self,featureShape,boxes, target):
         # [x0,y0,w,h]-->normalize 0~1--->[x1,y1,x2,y2]

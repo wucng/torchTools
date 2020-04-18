@@ -549,14 +549,13 @@ class YOLOv2Loss(YOLOv1Loss):
 
             for i in range(bs):
                 targets = targets_origin[i]
-                pred_box = preds[i, :,:,:4]
-                pred_conf = preds[i, :,:, 4].contiguous().view(-1)
-                pred_cls = preds[i, :,:, 5:].contiguous().view(-1,self.num_classes)  # *pred_conf # # 推理时做 p_cls*confidence
+                new_preds = preds[i]
+                new_preds[...,:4] = self.reverse_normalize((fh, fw), new_preds[...,:4], targets)
+                new_preds = new_preds[:, (new_preds[:, :, 4] * new_preds[:, :, 5:].max(-1)[0]).max(1)[1], :][:, 0, :]
 
-                # 转成x1,y1,x2,y2
-                # pred_box = self.reverse_normalize((fh, fw), pred_box,targets).contiguous().view(-1,4)
-                pred_box = self.reverse_normalize((fh, fw), pred_box,targets)
-                pred_box = pred_box[:, (pred_box[:, :, 4] * pred_box[:, :, 5:].max(-1)[0]).max(1)[1], :][:, 0, :]
+                pred_box = new_preds[:,:4]
+                pred_conf = new_preds[:, 4]
+                pred_cls = new_preds[:, 5:]
 
                 confidence = pred_conf
 

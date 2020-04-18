@@ -307,10 +307,43 @@ class YOLO(nn.Module):
                     # if not os.path.exists(os.path.dirname(newPath)): os.makedirs(os.path.dirname(newPath))
                     # cv2.imwrite(newPath, image)
 
+    def predict(self,nums=None):
+        self.network.eval()
+        with torch.no_grad():
+            for idx, (data, target) in enumerate(self.test_loader):
+                if nums is not None:
+                    if idx > nums:break
+                data = torch.stack(data,0) # 做测试时不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
+                if self.use_cuda:
+                    data = data.to(self.device)
+                    # data = [d.to(self.device) for d in data]
+                    new_target = [{k: v.to(self.device) for k, v in targ.items() if k!="path"} for targ in target]
+                else:
+                    new_target = target
 
+                output = self.network(data)
+                preds = self.loss_func(output,new_target)
 
-    def predict(self):
-        pass
+                for i in range(len(target)):
+                    pred = preds[i]
+                    if pred is None:continue
+                    path = target[i]["path"]
+                    image = np.asarray(PIL.Image.open(path).convert("RGB"), np.uint8)
+                    # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+                    image = self.draw_rect(image,pred)
+
+                    # cv2.imshow("test", image)
+                    # cv2.waitKey(0)
+                    # cv2.destroyAllWindows()
+                    plt.imshow(image)
+                    plt.show()
+                    # PIL.Image.fromarray(image).show()
+
+                    # save
+                    # newPath = path.replace("PNGImages", "result")
+                    # if not os.path.exists(os.path.dirname(newPath)): os.makedirs(os.path.dirname(newPath))
+                    # cv2.imwrite(newPath, image)
+
 
     def draw_rect(self,image,pred):
         labels = pred["labels"]

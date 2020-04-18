@@ -382,8 +382,8 @@ class YOLOv2Loss(YOLOv1Loss):
     VOC: (1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053), (11.2364, 10.0071)
     """
     # w,h
-    PreBoxSize = [(1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053), (11.2364, 10.0071)]
-    PreFSize = 416//32
+    # PreBoxSize = [(1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053), (11.2364, 10.0071)]
+    # PreFSize = 416//32
     # PreStride = 32
     # PreSize = 416
 
@@ -399,10 +399,13 @@ class YOLOv2Loss(YOLOv1Loss):
                                         num_classes,threshold_conf,threshold_cls,
                                         conf_thres,nms_thres,filter_labels,mulScale)
 
+        self.PreBoxSize = [(1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053), (11.2364, 10.0071)]
+        self.PreFSize = 416 // 32
+
         assert num_anchors==len(self.PreBoxSize),print("num_anchors:%d not equal num of PreBoxSize"%(num_anchors))
 
 
-    def normalize2(self, featureShape, target):
+    def normalize(self, featureShape, target):
         """不做筛选所有的anchor都参与计算"""
         grid_ceil_h, grid_ceil_w = featureShape
         h, w = target["resize"]
@@ -460,7 +463,7 @@ class YOLOv2Loss(YOLOv1Loss):
 
         return result
 
-    def normalize(self, featureShape, target):
+    def normalize2(self, featureShape, target):
         """加入按IOU筛选最好的anchor"""
         grid_ceil_h, grid_ceil_w = featureShape
         h, w = target["resize"]

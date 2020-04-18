@@ -153,7 +153,10 @@ class YOLO(nn.Module):
                                                  threshold_cls, conf_thres, nms_thres, filter_labels, self.mulScale)
             self.network = yoloNet.YOLOV2Net(num_classes, num_anchors, model_name, num_features, pretrained, dropRate, usize)
         else:
-            pass
+            self.loss_func = yoloLoss.YOLOv3Loss(self.device, num_anchors, num_classes, threshold_conf,
+                                                 threshold_cls, conf_thres, nms_thres, filter_labels, self.mulScale)
+            self.network = yoloNet.YOLOV2Net(num_classes, num_anchors, model_name, num_features, pretrained, dropRate,
+                                             usize)
         # self.network.apply(yoloNet.weights_init)
         self.network.fpn.apply(yoloNet.weights_init) # backbone 不使用
         self.network.net.apply(yoloNet.weights_init)
@@ -366,10 +369,10 @@ if __name__=="__main__":
     classes = ["person"]
     # testdataPath = "/home/wucong/practise/datas/valid/PNGImages/"
     # traindataPath = "/home/wucong/practise/datas/PennFudanPed/"
-    testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
-    traindataPath = "D:/practice/datas/PennFudanPed/"
-    # testdataPath = r"C:\practice\data\PennFudanPed\PNGImages"
-    # traindataPath = r"C:\practice\data\PennFudanPed"
+    # testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
+    # traindataPath = "D:/practice/datas/PennFudanPed/"
+    testdataPath = r"C:\practice\data\PennFudanPed\PNGImages"
+    traindataPath = r"C:\practice\data\PennFudanPed"
     typeOfData = "PennFudanDataset"
     """
     classes = ["bicycle", "bus", "car", "motorbike", "person"]
@@ -379,9 +382,9 @@ if __name__=="__main__":
     # """
 
     basePath = "./models/"
-    model = YOLO(traindataPath, testdataPath, "resnet18", pretrained=True, num_features=1,resize=(416,416),
+    model = YOLO(traindataPath, testdataPath, "resnet18", pretrained=False, num_features=1,resize=(416,416),
                    isTrain=False, num_anchors=5, mulScale=False, epochs=400, print_freq=40,dropRate=0.5,
                    basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,
-                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,version="v1")
+                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,version="v2")
 
     model()

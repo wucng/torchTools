@@ -111,7 +111,13 @@ class YOLO(nn.Module):
                 self.network = network(num_classes, num_anchors, model_name, num_features, pretrained, dropRate, usize)
 
         else:
-            pass
+            self.loss_func = yoloLoss.YOLOv3Loss(self.device, num_anchors, num_classes, threshold_conf,
+                                                 threshold_cls, conf_thres, nms_thres, filter_labels, self.mulScale)
+            if network is None:
+                self.network = yoloNet.YOLOV2Net(num_classes, num_anchors, model_name, num_features, pretrained,
+                                                 dropRate, usize)
+            else:
+                self.network = network(num_classes, num_anchors, model_name, num_features, pretrained, dropRate, usize)
 
         # self.network.apply(yoloNet.weights_init)
         self.network.fpn.apply(yoloNet.weights_init) # backbone 不使用

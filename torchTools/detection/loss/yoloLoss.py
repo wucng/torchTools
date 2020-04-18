@@ -396,6 +396,9 @@ class YOLOv2Loss(YOLOv1Loss):
 
         # assert num_anchors==len(self.PreBoxSize),print("num_anchors:%d not equal num of PreBoxSize"%(num_anchors))
 
+        self.mse_loss = nn.MSELoss(reduction='sum')
+        self.bce_loss = nn.BCELoss(reduction='sum')
+
     def forward(self,preds,targets,lossfunc="v2"):
         if "boxes" not in targets[0]:
             # return self.predict(preds,targets)
@@ -458,17 +461,12 @@ class YOLOv2Loss(YOLOv1Loss):
                 loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
                                                       reduction="sum")  # 对应背景
                 # boxes loss
-                # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
+                loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
                 # loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
-                loss_box_x = F.binary_cross_entropy(has_obj[..., 0], targ_obj[..., 0].detach(), reduction="sum")
-                loss_box_y = F.binary_cross_entropy(has_obj[..., 1], targ_obj[..., 1].detach(), reduction="sum")
-                loss_box_wh = F.mse_loss(has_obj[..., 2:4], targ_obj[..., 2:4].detach(), reduction="sum")
-                loss_box = loss_box_x+loss_box_y+loss_box_wh
 
                 # classify loss
-                # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
                 # loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
-                loss_clf = F.binary_cross_entropy(has_obj[..., 5:], targ_obj[..., 5:], reduction="sum")
 
                 # no obj classify loss
                 loss_no_clf = F.mse_loss(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
@@ -584,35 +582,38 @@ class YOLOv2Loss(YOLOv1Loss):
 
                 preds = preds.contiguous().view(-1,5 + self.num_classes)
                 targets = targets.contiguous().view(-1, 5 + self.num_classes)
-                noobj_mask = noobj_mask.contiguous().view(-1)
+                noobj_mask = noobj_mask.contiguous().view(-1,1)
 
-                index = targets[..., 4] == 1
-                # no_index = targets[..., 4] != 1
-                no_index = noobj_mask == 1
-                has_obj = preds[index]
-                no_obj = preds[no_index]
-                targ_obj = targets[index]
+                mask = targets[..., 4].unsqueeze(-1)
+                tconf = targets[..., 4].unsqueeze(-1)
+                tx = targets[..., 0].unsqueeze(-1)
+                ty = targets[..., 1].unsqueeze(-1)
+                tw = targets[..., 2].unsqueeze(-1)
+                th = targets[..., 3].unsqueeze(-1)
+                tcls = targets[..., 5:]
 
-                loss_conf = F.binary_cross_entropy(has_obj[..., 4], torch.ones_like(has_obj[..., 4]).detach(),
-                                                   reduction="sum")  # 对应目标
+                conf = preds[..., 4].unsqueeze(-1)
+                x = preds[..., 0].unsqueeze(-1)
+                y = preds[..., 1].unsqueeze(-1)
+                w = preds[..., 2].unsqueeze(-1)
+                h = preds[..., 3].unsqueeze(-1)
+                cls = preds[..., 5:]
 
-                loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
-                                                      reduction="sum")  # 对应背景
+                loss_conf = self.bce_loss(conf * mask,tconf*mask)  # 对应目标
+
+                loss_no_conf = self.bce_loss(conf*noobj_mask,torch.zeros_like(conf*noobj_mask)) # 对应背景
                 # boxes loss
-                # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
-                # loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
-                loss_box_x = F.binary_cross_entropy(has_obj[..., 0], targ_obj[..., 0].detach(), reduction="sum")
-                loss_box_y = F.binary_cross_entropy(has_obj[..., 1], targ_obj[..., 1].detach(), reduction="sum")
-                loss_box_wh = F.mse_loss(has_obj[..., 2:4], targ_obj[..., 2:4].detach(), reduction="sum")
-                loss_box = loss_box_x+loss_box_y+loss_box_wh
+                loss_x = self.bce_loss(x * mask, tx * mask)
+                loss_y = self.bce_loss(y * mask, ty * mask)
+                loss_w = self.mse_loss(w * mask, tw * mask)
+                loss_h = self.mse_loss(h * mask, th * mask)
+                loss_box = loss_x+loss_y+loss_w+loss_h
 
                 # classify loss
-                # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
-                # loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
-                loss_clf = F.binary_cross_entropy(has_obj[..., 5:], targ_obj[..., 5:], reduction="sum")
+                loss_clf = self.bce_loss(cls*mask,tcls*mask)
 
                 # no obj classify loss
-                loss_no_clf = F.mse_loss(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
+                loss_no_clf = self.mse_loss(cls*noobj_mask,torch.zeros_like(cls*noobj_mask))
 
                 if useFocal:
                     loss_conf = alpha * (1 - torch.exp(-loss_conf)) ** gamma * loss_conf
@@ -762,7 +763,7 @@ class YOLOv3Loss(YOLOv2Loss):
         self.PreBoxSize = np.asarray([(116, 90), (156, 198), (373 , 326)])/32.
         self.PreFSize = 416 // 32
 
-        assert num_anchors==len(self.PreBoxSize),print("num_anchors:%d not equal num of PreBoxSize"%(num_anchors))
+        # assert num_anchors==len(self.PreBoxSize),print("num_anchors:%d not equal num of PreBoxSize"%(num_anchors))
 
 
 def box_area(boxes):

@@ -554,7 +554,9 @@ class YOLOv2Loss(YOLOv1Loss):
                 pred_cls = preds[i, :,:, 5:].contiguous().view(-1,self.num_classes)  # *pred_conf # # 推理时做 p_cls*confidence
 
                 # 转成x1,y1,x2,y2
-                pred_box = self.reverse_normalize((fh, fw), pred_box,targets).contiguous().view(-1,4)
+                # pred_box = self.reverse_normalize((fh, fw), pred_box,targets).contiguous().view(-1,4)
+                pred_box = self.reverse_normalize((fh, fw), pred_box,targets)
+                pred_box = pred_box[:, (pred_box[:, :, 4] * pred_box[:, :, 5:].max(-1)[0]).max(1)[1], :][:, 0, :]
 
                 confidence = pred_conf
 

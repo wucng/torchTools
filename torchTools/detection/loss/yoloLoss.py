@@ -401,7 +401,7 @@ class YOLOv2Loss(YOLOv1Loss):
         self.mse_loss = nn.MSELoss(reduction='sum')
         self.bce_loss = nn.BCELoss(reduction='sum')
 
-    def forward(self,preds,targets,lossfunc="v2"):
+    def forward(self,preds,targets,lossfunc="v1"):
         if "boxes" not in targets[0]:
             # return self.predict(preds,targets)
             results = self.predict(preds,targets)

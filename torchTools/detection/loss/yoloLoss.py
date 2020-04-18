@@ -99,11 +99,13 @@ class YOLOv1Loss(nn.Module):
                 loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
 
                 # classify loss
-                loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                loss_clf = F.binary_cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
                 # loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
 
                 # no obj classify loss
                 loss_no_clf = F.mse_loss(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
+                # loss_no_clf = F.binary_cross_entropy(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
 
                 if useFocal:
                     loss_conf = alpha * (1 - torch.exp(-loss_conf)) ** gamma * loss_conf
@@ -524,12 +526,14 @@ class YOLOv2Loss(YOLOv1Loss):
                 h = preds[..., 3].unsqueeze(-1)
                 cls = preds[..., 5:]
 
-                loss_conf = self.bce_loss(conf * mask,tconf*mask)  # 对应目标
+                loss_conf = self.bce_loss(conf * mask,torch.ones_like(conf * mask))  # 对应目标
 
                 loss_no_conf = self.bce_loss(conf*noobj_mask,torch.zeros_like(conf*noobj_mask)) # 对应背景
                 # boxes loss
-                loss_x = self.bce_loss(x * mask, tx * mask)
-                loss_y = self.bce_loss(y * mask, ty * mask)
+                # loss_x = self.bce_loss(x * mask, tx * mask)
+                # loss_y = self.bce_loss(y * mask, ty * mask)
+                loss_x = self.mse_loss(x * mask, tx * mask)
+                loss_y = self.mse_loss(y * mask, ty * mask)
                 loss_w = self.mse_loss(w * mask, tw * mask)
                 loss_h = self.mse_loss(h * mask, th * mask)
                 loss_box = loss_x+loss_y+loss_w+loss_h

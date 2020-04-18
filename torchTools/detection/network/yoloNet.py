@@ -19,7 +19,8 @@ class YOLOV1Net(nn.Module):
         super(YOLOV1Net, self).__init__()
         self.backbone = BackBoneNet(model_name,pretrained,dropRate)
         self.num_features = self.backbone.num_features if num_features is None else num_features
-        self.fpn = FPNNet(self.backbone.backbone_size,self.num_features,usize)
+        # self.fpn = FPNNet(self.backbone.backbone_size,self.num_features,usize)
+        self.fpn = FPNNetLarger(self.backbone.backbone_size, self.num_features, usize)
         # self.fpn = XNet(self.backbone.backbone_size,self.num_features,usize)
         self.num_features = self.fpn.num_features
         self.num_classes = num_classes
@@ -59,7 +60,8 @@ class YOLOV2Net(nn.Module):
         super(YOLOV2Net, self).__init__()
         self.backbone = BackBoneNet(model_name,pretrained,dropRate)
         self.num_features = self.backbone.num_features if num_features is None else num_features
-        self.fpn = FPNNet(self.backbone.backbone_size,self.num_features,usize)
+        # self.fpn = FPNNet(self.backbone.backbone_size,self.num_features,usize)
+        self.fpn = FPNNetLarger(self.backbone.backbone_size,self.num_features,usize)
         # self.fpn = XNet(self.backbone.backbone_size,self.num_features,usize)
         self.num_features = self.fpn.num_features
         self.num_classes = num_classes

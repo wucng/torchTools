@@ -401,7 +401,7 @@ class YOLOv2Loss(YOLOv1Loss):
         self.mse_loss = nn.MSELoss(reduction='sum')
         self.bce_loss = nn.BCELoss(reduction='sum')
 
-    def forward(self,preds,targets,lossfunc="v1"):
+    def forward(self,preds,targets,lossfunc="v2"):
         if "boxes" not in targets[0]:
             # return self.predict(preds,targets)
             results = self.predict(preds,targets)
@@ -526,7 +526,7 @@ class YOLOv2Loss(YOLOv1Loss):
                 h = preds[..., 3].unsqueeze(-1)
                 cls = preds[..., 5:]
 
-                loss_conf = self.bce_loss(conf * mask,torch.ones_like(conf * mask))  # 对应目标
+                loss_conf = self.bce_loss(conf * mask,tconf*mask)  # 对应目标
 
                 loss_no_conf = self.bce_loss(conf*noobj_mask,torch.zeros_like(conf*noobj_mask)) # 对应背景
                 # boxes loss

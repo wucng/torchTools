@@ -610,7 +610,7 @@ class YOLOv2Loss(YOLOv1Loss):
             best_iou, best_anchor = iou.max(dim=0)
 
             noobj_mask[idx,y,x,torch.nonzero(iou>iou_thres)[:,0],0] = 0 # 忽略 ,是目标而不是背景
-            noobj_mask[idx,y,x,best_anchor,0] = 0
+            # noobj_mask[idx,y,x,best_anchor,0] = 0
 
             # if best_iou > 0:
             # 计算对应先念框的 h与w

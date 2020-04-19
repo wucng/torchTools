@@ -401,7 +401,7 @@ class YOLOv2Loss(YOLOv1Loss):
         # self.mse_loss = nn.MSELoss(reduction='sum')
         # self.bce_loss = nn.BCELoss(reduction='sum')
 
-    def forward(self,preds,targets,lossfunc="v2"):
+    def forward(self,preds,targets,lossfunc="v1"):
         if "boxes" not in targets[0]:
             # return self.predict(preds,targets)
             results = self.predict(preds,targets)
@@ -610,7 +610,7 @@ class YOLOv2Loss(YOLOv1Loss):
             best_iou, best_anchor = iou.max(dim=0)
 
             noobj_mask[idx,y,x,torch.nonzero(iou>iou_thres)[:,0],0] = 0 # 忽略 ,是目标而不是背景
-            # noobj_mask[idx,y,x,best_anchor,0] = 0
+            # noobj_mask[idx,y,x,best_anchor,0] = 0 # 加上效果很差？？？
 
             # if best_iou > 0:
             # 计算对应先念框的 h与w

@@ -411,7 +411,7 @@ class YOLOv2Loss(YOLOv1Loss):
             if lossfunc=="v1": # 类似于 yolov1的方式
                 return self.compute_loss(preds, targets,useFocal=True)
             else: # 效果差
-                return self.compute_loss2(preds, targets,useFocal=True)
+                return self.compute_loss2(preds, targets,useFocal=False)
 
 
     def normalize(self, featureShape, target):
@@ -610,7 +610,7 @@ class YOLOv2Loss(YOLOv1Loss):
         temp_gt_boxes = torch.cat((torch.zeros_like(gt_boxes), gt_boxes), -1)
 
         # IOU阈值
-        iou_thres = 0.3 #0.5
+        iou_thres = 0.5
 
         for i, (y, x) in enumerate(zip(grid_ceil[1], grid_ceil[0])):
             # 按IOU筛选最好的anchor

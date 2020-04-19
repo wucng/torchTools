@@ -409,7 +409,7 @@ class YOLOv2Loss(YOLOv1Loss):
             return results
         else:
             if lossfunc=="v1": # 类似于 yolov1的方式
-                return self.compute_loss(preds, targets,useFocal=True)
+                return self.compute_loss(preds, targets,useFocal=False)
             else: # 效果差
                 return self.compute_loss2(preds, targets,useFocal=False)
 

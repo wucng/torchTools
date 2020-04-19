@@ -505,13 +505,15 @@ class YOLOv2Loss(YOLOv1Loss):
         gt_boxes = boxes / torch.as_tensor([w, h, w, h],dtype=torch.float32, device=self.device).unsqueeze(0) # [x1,y1,x2,y2]
 
         xy = torch.stack((x0,y0),-1)
-        anchors = torch.cat((xy,self.PreBoxSize),-1)
 
         for i, (y, x) in enumerate(zip(grid_ceil[1], grid_ceil[0])):
+            anchors = torch.cat((xy[i].repeat(len(self.PreBoxSize)).view(len(self.PreBoxSize),2), self.PreBoxSize), -1)
+            # to x1y1x2y2
+            anchors = xywh2x1y1x2y2(anchors)
             iou = box_iou(anchors, gt_boxes[i][None, :])
             best_iou, best_anchor = iou.max(dim=0)
             index = torch.nonzero(iou>thred_iou)[:,0].cpu().numpy().tolist()
-            if best_anchor.cpu().numpy() not in index:index.append(best_anchor)
+            if best_anchor.cpu().numpy()[0] not in index:index.append(best_anchor.cpu().numpy()[0])
             for j in index:
                 # 计算对应先念框的 h与w
                 pw, ph = self.PreBoxSize[j]
@@ -619,3 +621,13 @@ def box_iou(boxes1, boxes2):
 
     iou = inter / (area1[:, None] + area2 - inter)
     return iou
+
+def xywh2x1y1x2y2(boxes):
+    """
+    :param boxes: [...,4]
+    :return:
+    """
+    x1y1=boxes[...,:2]-boxes[...,2:]/2
+    x2y2=boxes[...,:2]+boxes[...,2:]/2
+
+    return torch.cat((x1y1,x2y2),-1)

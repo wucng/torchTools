@@ -95,8 +95,8 @@ class YOLOv1Loss(nn.Module):
                 loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
                                                       reduction="sum")  # 对应背景
                 # boxes loss
-                loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
-                # loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
+                # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
+                loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
 
                 # classify loss
                 # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
@@ -398,10 +398,10 @@ class YOLOv2Loss(YOLOv1Loss):
 
         # assert num_anchors==len(self.PreBoxSize),print("num_anchors:%d not equal num of PreBoxSize"%(num_anchors))
 
-        self.mse_loss = nn.MSELoss(reduction='sum')
-        self.bce_loss = nn.BCELoss(reduction='sum')
+        # self.mse_loss = nn.MSELoss(reduction='sum')
+        # self.bce_loss = nn.BCELoss(reduction='sum')
 
-    def forward(self,preds,targets,lossfunc="v1"):
+    def forward(self,preds,targets,lossfunc="v2"):
         if "boxes" not in targets[0]:
             # return self.predict(preds,targets)
             results = self.predict(preds,targets)
@@ -409,9 +409,9 @@ class YOLOv2Loss(YOLOv1Loss):
             return results
         else:
             if lossfunc=="v1": # 类似于 yolov1的方式
-                return self.compute_loss(preds, targets,useFocal=False)
+                return self.compute_loss(preds, targets,useFocal=True)
             else: # 效果差
-                return self.compute_loss2(preds, targets,useFocal=False)
+                return self.compute_loss2(preds, targets,useFocal=True)
 
 
     def normalize(self, featureShape, target):
@@ -509,42 +509,34 @@ class YOLOv2Loss(YOLOv1Loss):
 
                 preds = preds.contiguous().view(-1,5 + self.num_classes)
                 targets = targets.contiguous().view(-1, 5 + self.num_classes)
-                noobj_mask = noobj_mask.contiguous().view(-1,1)
+                noobj_mask = noobj_mask.contiguous().view(-1)
 
-                mask = targets[..., 4].unsqueeze(-1)
-                tconf = targets[..., 4].unsqueeze(-1)
-                tx = targets[..., 0].unsqueeze(-1)
-                ty = targets[..., 1].unsqueeze(-1)
-                tw = targets[..., 2].unsqueeze(-1)
-                th = targets[..., 3].unsqueeze(-1)
-                tcls = targets[..., 5:]
+                index = targets[..., 4] == 1
+                # no_index = targets[..., 4] != 1
+                no_index = noobj_mask== 1
+                has_obj = preds[index]
+                no_obj = preds[no_index]
+                targ_obj = targets[index]
 
-                conf = preds[..., 4].unsqueeze(-1)
-                x = preds[..., 0].unsqueeze(-1)
-                y = preds[..., 1].unsqueeze(-1)
-                w = preds[..., 2].unsqueeze(-1)
-                h = preds[..., 3].unsqueeze(-1)
-                cls = preds[..., 5:]
+                loss_conf = F.binary_cross_entropy(has_obj[..., 4], torch.ones_like(has_obj[..., 4]).detach(),
+                                                   reduction="sum")  # 对应目标
 
-                loss_conf = self.bce_loss(conf * mask,tconf*mask)  # 对应目标
-
-                loss_no_conf = self.bce_loss(conf*noobj_mask,torch.zeros_like(conf*noobj_mask)) # 对应背景
+                loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
+                                                      reduction="sum")  # 对应背景
                 # boxes loss
-                # loss_x = self.bce_loss(x * mask, tx * mask)
-                # loss_y = self.bce_loss(y * mask, ty * mask)
-                loss_x = self.mse_loss(x * mask, tx * mask)
-                loss_y = self.mse_loss(y * mask, ty * mask)
-                loss_w = self.mse_loss(w * mask, tw * mask)
-                loss_h = self.mse_loss(h * mask, th * mask)
-                loss_box = loss_x+loss_y+loss_w+loss_h
+                # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
+                loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
 
                 # classify loss
-                loss_clf = self.bce_loss(cls*mask,tcls*mask)
+                # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                loss_clf = F.binary_cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                # loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
 
                 # no obj classify loss
-                loss_no_clf = self.mse_loss(cls*noobj_mask,torch.zeros_like(cls*noobj_mask))
+                loss_no_clf = F.mse_loss(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
+                # loss_no_clf = F.binary_cross_entropy(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
 
-                if useFocal:
+            if useFocal:
                     loss_conf = alpha * (1 - torch.exp(-loss_conf)) ** gamma * loss_conf
                     loss_no_conf = alpha * (1 - torch.exp(-loss_no_conf)) ** gamma * loss_no_conf
                     # loss_box = alpha * (1 - torch.exp(-loss_box)) ** gamma * loss_box
@@ -552,11 +544,11 @@ class YOLOv2Loss(YOLOv1Loss):
                     loss_no_clf = alpha * (1 - torch.exp(-loss_no_clf)) ** gamma * loss_no_clf
 
 
-                losses["loss_conf"] += loss_conf
-                losses["loss_no_conf"] += loss_no_conf * 0.05  # 0.05
-                losses["loss_box"] += loss_box * 50.  # 50
-                losses["loss_clf"] += loss_clf
-                losses["loss_no_clf"] += loss_no_clf * 0.05
+            losses["loss_conf"] += loss_conf
+            losses["loss_no_conf"] += loss_no_conf * 0.05  # 0.05
+            losses["loss_box"] += loss_box * 50.  # 50
+            losses["loss_clf"] += loss_clf
+            losses["loss_no_clf"] += loss_no_clf * 0.05
 
         return losses
 

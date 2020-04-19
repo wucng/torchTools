@@ -463,7 +463,7 @@ class YOLOv2Loss(YOLOv1Loss):
         return result
 
     def normalize(self, featureShape, target,thred_iou=0.5):
-        """不做筛选所有的anchor都参与计算"""
+        """做筛选anchor参与计算(根据IOU筛选)"""
         grid_ceil_h, grid_ceil_w = featureShape
         h, w = target["resize"]
         boxes = target["boxes"]

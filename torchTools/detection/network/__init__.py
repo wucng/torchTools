@@ -1,1 +1,1 @@
-from . import baseNet,yoloNet
+from . import baseNet,yoloNet,ssdNet

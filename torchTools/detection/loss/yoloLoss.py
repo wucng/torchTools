@@ -399,7 +399,7 @@ class YOLOv2Loss(YOLOv1Loss):
 
         # self.PreBoxSize = torch.as_tensor([(1.0, 1.0), (0.5, 0.5), (0.25, 0.25),(0.5,0.25),(0.25,0.5)], dtype=torch.float32,
         #                                   device=self.device)
-        self.PreBoxSize = torch.as_tensor([(0.5, 0.5), (0.1, 0.1), (0.05, 0.05),(0.3,0.1),(0.1,0.3)], dtype=torch.float32,
+        self.PreBoxSize = torch.as_tensor([(0.45, 0.45), (0.15, 0.15), (0.05, 0.05),(0.2,0.1),(0.1,0.2)], dtype=torch.float32,
                                           device=self.device)
 
         # self.mse_loss = nn.MSELoss(reduction='sum')
@@ -414,7 +414,7 @@ class YOLOv2Loss(YOLOv1Loss):
         else:
             return self.compute_loss(preds, targets,useFocal=True)
 
-    def normalize(self, featureShape, target):
+    def normalize2(self, featureShape, target):
         """不做筛选所有的anchor都参与计算"""
         grid_ceil_h, grid_ceil_w = featureShape
         h, w = target["resize"]
@@ -467,7 +467,7 @@ class YOLOv2Loss(YOLOv1Loss):
 
         return result
 
-    def normalize2(self, featureShape, target,thred_iou=0.5):
+    def normalize(self, featureShape, target,thred_iou=0.5):
         """做筛选anchor参与计算(根据IOU筛选)"""
         grid_ceil_h, grid_ceil_w = featureShape
         h, w = target["resize"]
@@ -586,7 +586,7 @@ class YOLOv3Loss(YOLOv2Loss):
         # resize到输入图像尺度上
         # self.PreBoxSize = np.asarray([(116, 90), (156, 198), (373 , 326)])/416.
         # self.PreBoxSize = torch.as_tensor([(1.0,1.0),(0.5,0.5),(0.25,0.25)],dtype=torch.float32,device=self.device)
-        self.PreBoxSize = torch.as_tensor([(0.5,0.5),(0.1,0.1),(0.05,0.05)],dtype=torch.float32,device=self.device)
+        self.PreBoxSize = torch.as_tensor([(0.4,0.4),(0.1,0.1),(0.05,0.05)],dtype=torch.float32,device=self.device)
 
 
 def box_area(boxes):

@@ -394,8 +394,11 @@ class YOLOv2Loss(YOLOv1Loss):
                                         conf_thres,nms_thres,filter_labels,mulScale)
 
         # 缩放到输入图像大小上 格式（w,h）
-        self.PreBoxSize = torch.as_tensor([(1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053),
-                           (11.2364, 10.0071)],device=self.device)/13.
+        # self.PreBoxSize = torch.as_tensor([(1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053),
+        #                    (11.2364, 10.0071)],device=self.device)/13.
+
+        self.PreBoxSize = torch.as_tensor([(1.0, 1.0), (0.5, 0.5), (0.25, 0.25),(0.5,0.25),(0.25,0.5)], dtype=torch.float32,
+                                          device=self.device)
 
         # self.mse_loss = nn.MSELoss(reduction='sum')
         # self.bce_loss = nn.BCELoss(reduction='sum')
@@ -578,8 +581,9 @@ class YOLOv3Loss(YOLOv2Loss):
         super(YOLOv3Loss,self).__init__(device, num_anchors,
                                         num_classes,threshold_conf,threshold_cls,
                                         conf_thres,nms_thres,filter_labels,mulScale)
-
-        self.PreBoxSize = np.asarray([(116, 90), (156, 198), (373 , 326)])/416.
+        # resize到输入图像尺度上
+        # self.PreBoxSize = np.asarray([(116, 90), (156, 198), (373 , 326)])/416.
+        self.PreBoxSize = torch.as_tensor([(1.0,1.0),(0.5,0.5),(0.25,0.25)],dtype=torch.float32,device=self.device)
 
 
 def box_area(boxes):

@@ -80,45 +80,53 @@ class YOLOv1Loss(nn.Module):
 
             for i, preds in enumerate(pred_list):
                 fh, fw = preds.shape[1:-1]
+
                 # normalize
                 targets = self.normalize((fh, fw), target_origin)
+                if targets is None:
+                    loss_conf = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                    loss_no_conf = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                    loss_box = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                    loss_clf = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                    loss_no_clf = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                else:
 
-                # preds = preds.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
-                # targets = targets.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
+                    # preds = preds.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
+                    # targets = targets.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
 
-                preds = preds.contiguous().view(-1,5 + self.num_classes)
-                targets = targets.contiguous().view(-1, 5 + self.num_classes)
+                    preds = preds.contiguous().view(-1,5 + self.num_classes)
+                    targets = targets.contiguous().view(-1, 5 + self.num_classes)
 
-                index = targets[..., 4] == 1
-                no_index = targets[..., 4] != 1
-                has_obj = preds[index]
-                no_obj = preds[no_index]
-                targ_obj = targets[index]
+                    index = targets[..., 4] == 1
+                    no_index = targets[..., 4] != 1
+                    has_obj = preds[index]
+                    no_obj = preds[no_index]
+                    targ_obj = targets[index]
 
-                loss_conf = F.binary_cross_entropy(has_obj[..., 4], torch.ones_like(has_obj[..., 4]).detach(),
-                                                   reduction="sum")  # 对应目标
+                    loss_conf = F.binary_cross_entropy(has_obj[..., 4], torch.ones_like(has_obj[..., 4]).detach(),
+                                                       reduction="sum")  # 对应目标
 
-                loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
-                                                      reduction="sum")  # 对应背景
-                # boxes loss
-                # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
-                loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
+                    loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
+                                                          reduction="sum")  # 对应背景
+                    # boxes loss
+                    # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
+                    loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
 
-                # classify loss
-                # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
-                loss_clf = F.binary_cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
-                # loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
+                    # classify loss
+                    # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                    loss_clf = F.binary_cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                    # loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
 
-                # no obj classify loss
-                loss_no_clf = F.mse_loss(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
-                # loss_no_clf = F.binary_cross_entropy(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
+                    # no obj classify loss
+                    loss_no_clf = F.mse_loss(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
+                    # loss_no_clf = F.binary_cross_entropy(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
 
-                if useFocal:
-                    loss_conf = alpha * (1 - torch.exp(-loss_conf)) ** gamma * loss_conf
-                    loss_no_conf = alpha * (1 - torch.exp(-loss_no_conf)) ** gamma * loss_no_conf
-                    # loss_box = alpha * (1 - torch.exp(-loss_box)) ** gamma * loss_box
-                    loss_clf = alpha * (1 - torch.exp(-loss_clf)) ** gamma * loss_clf
-                    loss_no_clf = alpha * (1 - torch.exp(-loss_no_clf)) ** gamma * loss_no_clf
+                    if useFocal:
+                        loss_conf = alpha * (1 - torch.exp(-loss_conf)) ** gamma * loss_conf
+                        loss_no_conf = alpha * (1 - torch.exp(-loss_no_conf)) ** gamma * loss_no_conf
+                        # loss_box = alpha * (1 - torch.exp(-loss_box)) ** gamma * loss_box
+                        loss_clf = alpha * (1 - torch.exp(-loss_clf)) ** gamma * loss_clf
+                        loss_no_clf = alpha * (1 - torch.exp(-loss_no_clf)) ** gamma * loss_no_clf
 
 
                 losses["loss_conf"] += loss_conf
@@ -133,6 +141,8 @@ class YOLOv1Loss(nn.Module):
         grid_ceil_h, grid_ceil_w = featureShape
         h, w = target["resize"]
         boxes = target["boxes"]
+        if len(boxes)==0:return None
+        if boxes.dim()<2:boxes = boxes.unsqueeze(0)
         labels = target["labels"]
         strides_h = h//grid_ceil_h
         strides_w = w//grid_ceil_w
@@ -419,6 +429,8 @@ class YOLOv2Loss(YOLOv1Loss):
         grid_ceil_h, grid_ceil_w = featureShape
         h, w = target["resize"]
         boxes = target["boxes"]
+        if len(boxes)==0:return None
+        if boxes.dim()<2:boxes = boxes.unsqueeze(0)
         labels = target["labels"]
         strides_h = h // grid_ceil_h
         strides_w = w // grid_ceil_w
@@ -472,6 +484,8 @@ class YOLOv2Loss(YOLOv1Loss):
         grid_ceil_h, grid_ceil_w = featureShape
         h, w = target["resize"]
         boxes = target["boxes"]
+        if len(boxes)==0:return None
+        if boxes.dim()<2:boxes = boxes.unsqueeze(0)
         labels = target["labels"]
         strides_h = h // grid_ceil_h
         strides_w = w // grid_ceil_w

@@ -79,27 +79,31 @@ class SSDLoss(nn.Module):
                 # normalize
                 gt_locations,labels = self.normalize((fh, fw), target_origin)
 
-                preds = preds.contiguous().view(-1,5 + self.num_classes)
+                if gt_locations is None:
+                    smooth_l1_loss = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                    classification_loss = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                else:
+                    preds = preds.contiguous().view(-1,5 + self.num_classes)
 
-                confidence = preds[...,4:] # 包括背景（背景与类别放在一起做，yolo则是分开做）
-                predicted_locations = preds[...,:4]
-                with torch.no_grad():
-                    # derived from cross_entropy=sum(log(p))
-                    loss = -F.log_softmax(confidence, dim=1)[:, 0]  # 计算背景置信度loss，后续需按loss从大到小排序，选择更新的mask
-                    mask = hard_negative_mining(loss, labels, self.neg_pos_ratio)
+                    confidence = preds[...,4:] # 包括背景（背景与类别放在一起做，yolo则是分开做）
+                    predicted_locations = preds[...,:4]
+                    with torch.no_grad():
+                        # derived from cross_entropy=sum(log(p))
+                        loss = -F.log_softmax(confidence, dim=1)[:, 0]  # 计算背景置信度loss，后续需按loss从大到小排序，选择更新的mask
+                        mask = hard_negative_mining(loss, labels, self.neg_pos_ratio)
 
-                confidence = confidence[mask, :]
-                classification_loss = F.cross_entropy(confidence, labels[mask], reduction='sum')
+                    confidence = confidence[mask, :]
+                    classification_loss = F.cross_entropy(confidence, labels[mask], reduction='sum')
 
-                # 定位loss 只更新正样本的
-                pos_mask = labels > 0
-                predicted_locations = predicted_locations[pos_mask, :]
-                gt_locations = gt_locations[pos_mask, :]
-                smooth_l1_loss = F.smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')
+                    # 定位loss 只更新正样本的
+                    pos_mask = labels > 0
+                    predicted_locations = predicted_locations[pos_mask, :]
+                    gt_locations = gt_locations[pos_mask, :]
+                    smooth_l1_loss = F.smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')
 
-                if useFocal:
-                    classification_loss = alpha * (1 - torch.exp(-classification_loss)) ** gamma * classification_loss
-                    smooth_l1_loss = alpha * (1 - torch.exp(-smooth_l1_loss)) ** gamma * smooth_l1_loss
+                    if useFocal:
+                        classification_loss = alpha * (1 - torch.exp(-classification_loss)) ** gamma * classification_loss
+                        smooth_l1_loss = alpha * (1 - torch.exp(-smooth_l1_loss)) ** gamma * smooth_l1_loss
 
 
                 losses["loss_box"] += smooth_l1_loss * 5.
@@ -148,8 +152,11 @@ class SSDLoss(nn.Module):
         center_form_priors = self.get_prior_box((fh, fw), target)
         priors_x1y1x2y2 = xywh2x1y1x2y2(center_form_priors)
 
-        gt_boxes = torch.as_tensor(target["boxes"], dtype=torch.float32, device=self.device)  # (x1,y1,x2,y2)
-        gt_labels = torch.as_tensor(target["labels"], dtype=torch.int64, device=self.device)+1 # 背景为0
+        gt_boxes = target["boxes"]  # (x1,y1,x2,y2)
+        if len(gt_boxes)==0:return None,None
+        if gt_boxes.dim()<2:gt_boxes = gt_boxes.unsqueeze(0)
+
+        gt_labels = target["labels"]+1 # 背景为0
         input_size = target["resize"]
         # 缩放到输入图像
         gt_boxes = gt_boxes / torch.as_tensor(

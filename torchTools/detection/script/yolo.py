@@ -101,7 +101,7 @@ class YOLO(nn.Module):
                 pass
             train_dataset = Data(trainDP,
                       transforms=bboxAug.Compose([
-                          bboxAug.RandomChoice(),
+                          # bboxAug.RandomChoice(),
                           bboxAug.Pad(), bboxAug.Resize(resize, mulScale),
                           # *random.choice([
                           #     [bboxAug.Pad(), bboxAug.Resize(resize, mulScale)],
@@ -117,7 +117,7 @@ class YOLO(nn.Module):
                           # bboxAug.RandomHue(),
                           # bboxAug.RandomBlur(),
 
-                          bboxAug.Augment(advanced),
+                          # bboxAug.Augment(advanced),
                           # -------------------------------
 
                           bboxAug.ToTensor(),  # PIL --> tensor

@@ -24,14 +24,15 @@ def collate_fn(batch_data):
 
 
 def test_datasets():
-    root = "C:/Users/MI/Documents/GitHub/PennFudanPed/"
+    root = r"C:\practice\data\PennFudanPed"
     seed = 100
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     torch.manual_seed(seed)
     kwargs = {'num_workers': 5, 'pin_memory': True} if use_cuda else {}
 
-    PennFudanDataset = datasets.datasets.PennFudanDataset
+    # PennFudanDataset = datasets.datasets.PennFudanDataset
+    PennFudanDataset = datasets.datasets2.PennFudanDataset
     vis_rect = visual.opencv.vis_rect
 
     # dataset = PennFudanDataset(root, transforms=None)

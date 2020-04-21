@@ -1,1 +1,1 @@
-from . import baseNet,yoloNet,ssdNet,cascadeSSDNet
+from . import baseNet,yoloNet,ssdNet,cascadeSSDNet,fasterrcnnNet

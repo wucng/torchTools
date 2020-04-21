@@ -67,7 +67,7 @@ class PascalVOCDataset(Dataset):
         for obj in root.iter('object'):
             difficult = obj.find('difficult').text
             cls = obj.find('name').text
-            if cls not in self.classes or int(difficult)==1:
+            if cls not in self.classes:# or int(difficult)==1:
                 continue
             cls_id = self.classes.index(cls)  # 这里不包含背景，如果要包含背景 只需+1, 0默认为背景
             xmlbox = obj.find('bndbox')

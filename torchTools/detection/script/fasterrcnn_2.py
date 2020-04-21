@@ -40,6 +40,7 @@ cp references/detection/engine.py ../
 cp references/detection/coco_utils.py ../
 """
 
+# !pip install -U 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'
 import os
 import numpy as np
 import torch
@@ -192,7 +193,7 @@ class Fasterrcnn(nn.Module):
 
             for idx, filename in enumerate(temp):
                 # image = cv2.imread(filename)
-                image = np.asarray(Image.open(path).convert("RGB"), np.uint8)
+                image = np.asarray(Image.open(filename).convert("RGB"), np.uint8)
                 _detections = self.apply_nms(detections[idx])
                 if _detections is None:
                     # cv2.imwrite(filename.replace("image","out"),image)
@@ -267,7 +268,7 @@ if __name__ == "__main__":
     testdataPath = r"C:\practice\data\PennFudanPed\PNGImages"
     traindataPath = r"C:\practice\data\PennFudanPed"
 
-    model = Fasterrcnn(traindataPath, 2, "resnet34", pretrained=True,
+    model = Fasterrcnn(traindataPath, classes, "resnet34", pretrained=True, num_epochs=5,
                                     conf_thres=0.7, nms_thres=0.4,
                                     use_FPN=False, basePath=basePath)
 

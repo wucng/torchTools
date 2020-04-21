@@ -87,7 +87,9 @@ def get_transform(train):
 
 
 class Fasterrcnn(nn.Module):
-    def __init__(self,trainDP=None,num_classes=2,lr=5e-3,num_epochs = 10,
+    def __init__(self,trainDP=None,num_classes=2,model_name="resnet101",
+                 pretrained=False,hideSize=64,usize = 256,use_FPN=False,
+                 lr=5e-3,num_epochs = 10,
                  print_freq=10,conf_thres=0.7,nms_thres=0.4,
                  batch_size=2,test_batch_size = 2,
                  basePath="./models/",save_model="model.pt"):
@@ -128,9 +130,9 @@ class Fasterrcnn(nn.Module):
 
 
         # get the model using our helper function
-        # self.network = fasterrcnnNet.FasterRCNN0(num_classes,True)
-        self.network = fasterrcnnNet.FasterRCNN1(num_classes,"resnet18",False,use_FPN=False)
-        # self.network = fasterrcnnNet.get_instance_segmentation_model(num_classes,True,256) # maskrcnn
+        # self.network = fasterrcnnNet.FasterRCNN0(num_classes,pretrained)
+        self.network = fasterrcnnNet.FasterRCNN1(num_classes,model_name,pretrained,hideSize,usize,use_FPN)
+        # self.network = fasterrcnnNet.get_instance_segmentation_model(num_classes,pretrained,usize) # maskrcnn
         if self.use_cuda:
             # move model to the right device
             self.network.to(self.device)

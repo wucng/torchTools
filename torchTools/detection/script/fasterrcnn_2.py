@@ -87,9 +87,9 @@ def get_transform(train):
 
 
 class Fasterrcnn(nn.Module):
-    def __init__(self,trainDP=None,num_classes=2,model_name="resnet101",
+    def __init__(self,trainDP=None,classes=[],model_name="resnet101",
                  pretrained=False,hideSize=64,usize = 256,use_FPN=False,
-                 lr=5e-3,num_epochs = 10,
+                 lr=5e-3,num_epochs = 10,filter_labels=[],
                  print_freq=10,conf_thres=0.7,nms_thres=0.4,
                  batch_size=2,test_batch_size = 2,
                  basePath="./models/",save_model="model.pt"):
@@ -102,6 +102,9 @@ class Fasterrcnn(nn.Module):
         self.conf_thres = conf_thres
         self.nms_thres = nms_thres
         self.test_batch_size = test_batch_size
+        self.classes = classes
+        num_classes = len(classes)+1 # 加上背景
+        self.filter_labels = filter_labels
 
         # seed = 100
         seed = int(time.time() * 1000)
@@ -189,12 +192,12 @@ class Fasterrcnn(nn.Module):
 
             for idx, filename in enumerate(temp):
                 # image = cv2.imread(filename)
-                image = np.asarray(PIL.Image.open(path).convert("RGB"), np.uint8)
-                _detections = apply_nms(detections[idx], self.conf_thres, self.nms_thres, self.device)
+                image = np.asarray(Image.open(path).convert("RGB"), np.uint8)
+                _detections = self.apply_nms(detections[idx])
                 if _detections is None:
                     # cv2.imwrite(filename.replace("image","out"),image)
                     continue
-                image = draw_rect(image, _detections)
+                image = self.draw_rect(image, _detections)
                 # cv2.imshow("test", image)
                 # cv2.waitKey(0)
                 # cv2.destroyAllWindows()
@@ -208,57 +211,57 @@ class Fasterrcnn(nn.Module):
                 # cv2.imwrite(newPath, image)
 
 
-def apply_nms(prediction,conf_thres=0.8,nms_thres=0.4,filter_labels=[],device="cpu"):
-    ms = prediction["scores"] > conf_thres
-    if torch.sum(ms) == 0:
-        return None
-    else:
-        last_scores = []
-        last_labels = []
-        last_boxes = []
+    def apply_nms(self,prediction):
+        ms = prediction["scores"] > self.conf_thres
+        if torch.sum(ms) == 0:
+            return None
+        else:
+            last_scores = []
+            last_labels = []
+            last_boxes = []
 
-        scores = prediction["scores"][ms]
-        labels = prediction["labels"][ms]
-        boxes = prediction["boxes"][ms]
-        unique_labels = labels.unique()
-        for c in unique_labels:
-            if c in filter_labels:continue
+            scores = prediction["scores"][ms]
+            labels = prediction["labels"][ms]
+            boxes = prediction["boxes"][ms]
+            unique_labels = labels.unique()
+            for c in unique_labels:
+                if c in self.filter_labels:continue
 
-            # Get the detections with the particular class
-            temp = labels == c
-            _scores = scores[temp]
-            _labels = labels[temp]
-            _boxes = boxes[temp]
-            if len(_labels) > 1:
+                # Get the detections with the particular class
+                temp = labels == c
+                _scores = scores[temp]
+                _labels = labels[temp]
+                _boxes = boxes[temp]
+                if len(_labels) > 1:
 
-                # keep=py_cpu_nms(_boxes.cpu().numpy(),_scores.cpu().numpy(),nms_thres)
-                keep=nms(_boxes,_scores,nms_thres)
-                # keep = batched_nms(_boxes, _scores, _labels, nms_thres)
-                last_scores.extend(_scores[keep])
-                last_labels.extend(_labels[keep])
-                last_boxes.extend(_boxes[keep])
+                    # keep=py_cpu_nms(_boxes.cpu().numpy(),_scores.cpu().numpy(),self.nms_thres)
+                    keep=nms(_boxes,_scores,self.nms_thres)
+                    # keep = batched_nms(_boxes, _scores, _labels, self.nms_thres)
+                    last_scores.extend(_scores[keep])
+                    last_labels.extend(_labels[keep])
+                    last_boxes.extend(_boxes[keep])
 
-            else:
-                last_scores.extend(_scores)
-                last_labels.extend(_labels)
-                last_boxes.extend(_boxes)
+                else:
+                    last_scores.extend(_scores)
+                    last_labels.extend(_labels)
+                    last_boxes.extend(_boxes)
 
-        return {"scores": last_scores, "labels": last_labels, "boxes": last_boxes}
+            return {"scores": last_scores, "labels": last_labels, "boxes": last_boxes}
 
-def draw_rect(image, pred):
-    labels = pred["labels"]
-    bboxs = pred["boxes"]
-    scores = pred["scores"]
+    def draw_rect(self,image, pred):
+        labels = pred["labels"]
+        bboxs = pred["boxes"]
+        scores = pred["scores"]
 
-    for label, bbox, score in zip(labels, bboxs, scores):
-        label = label.cpu().numpy()
-        bbox = bbox.cpu().numpy()  # .astype(np.int16)
-        score = score.cpu().numpy()
-        class_str = "%s:%.3f" % (self.classes[int(label)], score)  # 跳过背景
-        pos = list(map(int, bbox))
+        for label, bbox, score in zip(labels, bboxs, scores):
+            label = label.cpu().numpy()
+            bbox = bbox.cpu().numpy()  # .astype(np.int16)
+            score = score.cpu().numpy()
+            class_str = "%s:%.3f" % (self.classes[int(label)], score)  # 跳过背景
+            pos = list(map(int, bbox))
 
-        image = opencv.vis_rect(image, pos, class_str, 0.5, int(label))
-    return image
+            image = opencv.vis_rect(image, pos, class_str, 0.5, int(label))
+        return image
 
 if __name__ == "__main__":
     testdataPath = r"C:\practice\data\PennFudanPed\PNGImages"

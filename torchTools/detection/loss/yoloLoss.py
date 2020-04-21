@@ -10,10 +10,14 @@ try:
 except:
     from boxestool import batched_nms
 """
+import sys
 try:
-    from .py_cpu_nms import py_cpu_nms
+    # from ..tools.nms.py_cpu_nms import py_cpu_nms
+    from ..tools.nms.nms_pytorch import nms,nms2
 except:
-    from py_cpu_nms import py_cpu_nms
+    sys.path.append("..")
+    # from tools.nms.py_cpu_nms import py_cpu_nms
+    from tools.nms.nms_pytorch import nms,nms2
 
 from torch import nn
 import torch
@@ -337,8 +341,8 @@ class YOLOv1Loss(nn.Module):
                     # _boxes=_boxes[conf_sort_index]
 
                     # """
-                    keep=py_cpu_nms(_boxes.cpu().numpy(),_scores.cpu().numpy(),self.nms_thres)
-                    # keep = nms(_boxes, _scores, nms_thres)
+                    # keep=py_cpu_nms(_boxes.cpu().numpy(),_scores.cpu().numpy(),self.nms_thres)
+                    keep = nms2(_boxes, _scores, nms_thres)
                     # keep = batched_nms(_boxes, _scores, _labels, self.nms_thres)
                     last_scores.extend(_scores[keep])
                     last_labels.extend(_labels[keep])

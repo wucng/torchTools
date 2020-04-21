@@ -181,7 +181,7 @@ class CascadeSSD(nn.Module):
         # self.optimizer = torch.optim.Adam(params, weight_decay=4e-05)
         self.optimizer = optimizer.RAdam(params, weight_decay=4e-05)
         if self.useRCNN:
-            self.optimizer_rcnn = torch.optim.Adam(self.network.rcnnNet.parameters(),lr=lr, weight_decay=4e-05)
+            self.optimizer_rcnn = torch.optim.Adam(self.network.rcnnNet.parameters(),lr=lr/10, weight_decay=4e-05)
 
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1)
         if self.useRCNN:

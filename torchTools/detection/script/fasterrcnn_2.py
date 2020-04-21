@@ -160,7 +160,7 @@ class Fasterrcnn(nn.Module):
         for epoch in range(self.num_epochs):
             self.train(epoch)
             # update the learning rate
-            lr_scheduler.step()
+            self.lr_scheduler.step()
             # self.eval()
             torch.save(self.network.state_dict(), self.save_model)
 
@@ -263,6 +263,10 @@ if __name__ == "__main__":
     testdataPath = r"C:\practice\data\PennFudanPed\PNGImages"
     traindataPath = r"C:\practice\data\PennFudanPed"
 
-    model = Fasterrcnn(traindataPath,2)
+    model = Fasterrcnn(traindataPath, 2, "resnet34", pretrained=True,
+                                    conf_thres=0.7, nms_thres=0.4,
+                                    use_FPN=False, basePath=basePath)
 
     model()
+
+    model.predict(traindataPath,3)

@@ -37,7 +37,7 @@ class CascadeSSDLoss(nn.Module):
         self.num_classes = num_classes
         # self.threshold_conf = threshold_conf
         self.threshold_cls = threshold_cls
-        self.threshold_cls_2 = 0.3
+        self.threshold_cls_2 = 0.05
         self.mulScale = mulScale
         self.conf_thres = conf_thres
         self.nms_thres = nms_thres

@@ -8,11 +8,7 @@ except:
     from boxestool import batched_nms
 """
 import sys,os
-try:
-    # from ..tools.nms.py_cpu_nms import py_cpu_nms
-    from ..tools.nms.nms_pytorch import nms,nms2
-except:
-    from .nms_pytorch import nms,nms2
+from .nms_pytorch import nms,nms2
 
 from torch import nn
 import torch

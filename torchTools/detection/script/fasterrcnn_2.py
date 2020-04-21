@@ -60,9 +60,10 @@ try:
     from .tools import transforms as T
     from .tools.nms_pytorch import nms2 as nms
     from ..network import fasterrcnnNet
-    from ..visual import opencv
+    from ..visual import opencv,colormap
     # from ..loss import yoloLoss
     from ..datasets.datasets2 import PennFudanDataset,glob_format
+    from ..datasets import bboxAug
 except:
     from tools.engine import train_one_epoch, evaluate
     from tools import utils
@@ -73,10 +74,38 @@ except:
     from network import fasterrcnnNet
     # from loss import yoloLoss
     from datasets.datasets2 import PennFudanDataset, glob_format
-    from visual import opencv
+    from visual import opencv,colormap
+    from datasets import bboxAug
 
 
-def get_transform(train):
+def get_transform(train,advanced=False):
+    transforms = []
+    if train:
+        # during training, randomly flip the training images
+        # and ground-truth for data augmentation
+        transforms_list = [
+            bboxAug.RandomChoice(),
+
+            # ---------两者取其一--------------------
+            bboxAug.RandomHorizontalFlip(),
+            bboxAug.RandomTranslate(),
+            # bboxAug.RandomRotate(3),
+            bboxAug.RandomBrightness(),
+            bboxAug.RandomSaturation(),
+            bboxAug.RandomHue(),
+            bboxAug.RandomBlur(),
+            # ---------两者取其一--------------------
+            # bboxAug.Augment(advanced),
+            # ---------两者取其一--------------------
+        ]
+
+        transforms.extend(transforms_list)
+
+    transforms.append(bboxAug.ToTensor())
+
+    return T.Compose(transforms)
+
+def get_transform2(train):
     transforms = []
     # converts the image, a PIL image, into a PyTorch Tensor
     transforms.append(T.ToTensor())
@@ -84,6 +113,7 @@ def get_transform(train):
         # during training, randomly flip the training images
         # and ground-truth for data augmentation
         transforms.append(T.RandomHorizontalFlip(0.5))
+
     return T.Compose(transforms)
 
 
@@ -93,7 +123,8 @@ class Fasterrcnn(nn.Module):
                  lr=5e-3,num_epochs = 10,filter_labels=[],
                  print_freq=10,conf_thres=0.7,nms_thres=0.4,
                  batch_size=2,test_batch_size = 2,
-                 basePath="./models/",save_model="model.pt"):
+                 basePath="./models/",save_model="model.pt",
+                 useMask=False,selfmodel=True):
         super(Fasterrcnn,self).__init__()
         # our dataset has two classes only - background and person
         # num_classes = num_classes
@@ -106,6 +137,7 @@ class Fasterrcnn(nn.Module):
         self.classes = classes
         num_classes = len(classes)+1 # 加上背景
         self.filter_labels = filter_labels
+        self.useMask = useMask
 
         # seed = 100
         seed = int(time.time() * 1000)
@@ -133,10 +165,18 @@ class Fasterrcnn(nn.Module):
             collate_fn=utils.collate_fn,**kwargs)
 
 
-        # get the model using our helper function
-        # self.network = fasterrcnnNet.FasterRCNN0(num_classes,pretrained)
-        self.network = fasterrcnnNet.FasterRCNN1(num_classes,model_name,pretrained,hideSize,usize,use_FPN)
-        # self.network = fasterrcnnNet.get_instance_segmentation_model(num_classes,pretrained,usize) # maskrcnn
+        if useMask:
+            if selfmodel:
+                self.network = fasterrcnnNet.get_instance_segmentation_model_cum(num_classes, model_name, pretrained, hideSize, usize, use_FPN)
+            else:
+                self.network = fasterrcnnNet.get_instance_segmentation_model(num_classes,pretrained,usize) # maskrcnn
+        else:
+            if selfmodel:
+                # get the model using our helper function
+                self.network = fasterrcnnNet.FasterRCNN1(num_classes, model_name, pretrained, hideSize, usize, use_FPN)
+            else:
+                self.network = fasterrcnnNet.FasterRCNN0(num_classes,pretrained)
+
         if self.use_cuda:
             # move model to the right device
             self.network.to(self.device)
@@ -183,7 +223,8 @@ class Fasterrcnn(nn.Module):
         preprocess = TT.Compose([
             TT.ToTensor()
         ])
-        for i in tqdm(range(len(filenames) // self.test_batch_size)):
+        # for i in tqdm(range(len(filenames) // self.test_batch_size)):
+        for i in range(len(filenames) // self.test_batch_size):
             if nums is not None and i>nums:break
             temp = filenames[i * self.test_batch_size:(i + 1) * self.test_batch_size]
             input_batch = [preprocess(Image.open(filename).convert("RGB")).to(self.device) for filename in temp]
@@ -220,10 +261,13 @@ class Fasterrcnn(nn.Module):
             last_scores = []
             last_labels = []
             last_boxes = []
+            if self.useMask:last_masks=[]
 
             scores = prediction["scores"][ms]
             labels = prediction["labels"][ms]
             boxes = prediction["boxes"][ms]
+            if self.useMask:masks= prediction["masks"][ms]
+
             unique_labels = labels.unique()
             for c in unique_labels:
                 if c in self.filter_labels:continue
@@ -233,6 +277,8 @@ class Fasterrcnn(nn.Module):
                 _scores = scores[temp]
                 _labels = labels[temp]
                 _boxes = boxes[temp]
+                if self.useMask:_masks = masks[temp]
+
                 if len(_labels) > 1:
 
                     # keep=py_cpu_nms(_boxes.cpu().numpy(),_scores.cpu().numpy(),self.nms_thres)
@@ -241,27 +287,44 @@ class Fasterrcnn(nn.Module):
                     last_scores.extend(_scores[keep])
                     last_labels.extend(_labels[keep])
                     last_boxes.extend(_boxes[keep])
+                    if self.useMask:last_masks.extend(_masks[keep])
 
                 else:
                     last_scores.extend(_scores)
                     last_labels.extend(_labels)
                     last_boxes.extend(_boxes)
+                    if self.useMask: last_masks.extend(_masks[keep])
+
+            if self.useMask:
+                return {"scores": last_scores, "labels": last_labels, "boxes": last_boxes, "masks": last_masks}
 
             return {"scores": last_scores, "labels": last_labels, "boxes": last_boxes}
 
-    def draw_rect(self,image, pred):
+    def draw_rect(self,image, pred,segms=True):
+        """segms=False 不画mask"""
         labels = pred["labels"]
         bboxs = pred["boxes"]
         scores = pred["scores"]
+
+        if segms and self.useMask:
+            masks = pred["masks"]
+            mask_color_id = 0
+            color_list = colormap.colormap()
 
         for label, bbox, score in zip(labels, bboxs, scores):
             label = label.cpu().numpy()
             bbox = bbox.cpu().numpy()  # .astype(np.int16)
             score = score.cpu().numpy()
-            class_str = "%s:%.3f" % (self.classes[int(label)], score)  # 跳过背景
+            class_str = "%s:%.3f" % (self.classes[int(label)-1], score)  # 跳过背景
             pos = list(map(int, bbox))
+            image = opencv.vis_rect(image, pos, class_str, 0.5, int(label),useMask=False if self.useMask else True)
+            if segms and self.useMask:
+                mask = masks[idx].cpu().numpy()
+                mask = np.clip(np.squeeze(mask, 0) * 255., 0, 255).astype(np.uint8)
+                mask_color_id += 1
+                color_mask = color_list[mask_color_id % len(color_list), 0:3]
+                image = opencv.vis_mask(image, mask, color_mask, 0.3, False)
 
-            image = opencv.vis_rect(image, pos, class_str, 0.5, int(label))
         return image
 
 if __name__ == "__main__":

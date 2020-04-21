@@ -169,18 +169,23 @@ class CascadeSSD(nn.Module):
         base_params = list(
             map(id, self.network.backbone.parameters())
         )
-        logits_params = filter(lambda p: id(p) not in base_params, self.network.parameters())
+        # logits_params = filter(lambda p: id(p) not in base_params, self.network.parameters())
 
         params = [
-            {"params": logits_params, "lr": lr},  # 1e-3
+            {"params": self.network.fpn.parameters(), "lr": lr},  # 1e-3
+            {"params": self.network.rpnNet.parameters(), "lr": lr},  # 1e-3
             {"params": self.network.backbone.parameters(), "lr": lr / 10},  # 1e-4
         ]
 
         # self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr, weight_decay=4e-05)
         # self.optimizer = torch.optim.Adam(params, weight_decay=4e-05)
         self.optimizer = optimizer.RAdam(params, weight_decay=4e-05)
+        if self.useRCNN:
+            self.optimizer_rcnn = torch.optim.Adam(self.network.rcnnNet.parameters(),lr=lr, weight_decay=4e-05)
 
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1)
+        if self.useRCNN:
+            self.lr_scheduler_rcnn = torch.optim.lr_scheduler.StepLR(self.optimizer_rcnn, step_size=20, gamma=0.1)
 
         self.writer = SummaryWriter(os.path.join(basePath,summaryPath))
 
@@ -194,6 +199,7 @@ class CascadeSSD(nn.Module):
                 #     self.test(3)
                 # update the learning rate
                 self.lr_scheduler.step()
+                if self.useRCNN:self.lr_scheduler_rcnn.step()
                 torch.save(self.network.state_dict(), self.save_model)
                 # torch.save(self.network.state_dict(), self.save_model+"_"+str(epoch))
 
@@ -233,12 +239,28 @@ class CascadeSSD(nn.Module):
 
             loss_dict = self.loss_func(output, target)
 
-            losses = sum(loss for loss in loss_dict.values())
+            # losses = sum(loss for loss in loss_dict.values())
+            losses_rpn = 0
+            losses_rcnn = 0
+            for k, v in loss_dict.items():
+                if "rcnn" in k:
+                    losses_rcnn += v
+                else:
+                    losses_rpn += v
 
             self.optimizer.zero_grad()
-            losses.backward()
+            if self.useRCNN:
+                losses_rpn.backward(retain_graph=True)
+            else:
+                losses_rpn.backward()
             self.optimizer.step()
 
+            if self.useRCNN:
+                self.optimizer_rcnn.zero_grad()
+                losses_rcnn.backward()
+                self.optimizer_rcnn.step()
+
+            losses = sum(loss for loss in loss_dict.values())
             # 记录到TensorBoard
             self.writer.add_scalar('total_loss', losses.item(), epoch * num_trains // self.batch_size + idx)
             for key, loss in loss_dict.items():
@@ -378,6 +400,6 @@ if __name__=="__main__":
     model = CascadeSSD(traindataPath, testdataPath, "resnet18", pretrained=False, num_features=2,resize=(160,160),
                    isTrain=True, num_anchors=3, mulScale=False, epochs=400, print_freq=40,dropRate=0.5,
                    basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,
-                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=128,useRCNN=True)
+                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=128,useRCNN=False)
 
     model()

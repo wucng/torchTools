@@ -41,7 +41,7 @@ class CascadeSSDLoss(nn.Module):
         self.mulScale = mulScale
         self.conf_thres = conf_thres
         self.nms_thres = nms_thres
-        self.nms_thres_2 = 0.7
+        self.nms_thres_2 = 0.5
         self.filter_labels = filter_labels
         self.neg_pos_ratio = 3
         self.useRCNN = useRCNN
@@ -157,13 +157,15 @@ class CascadeSSDLoss(nn.Module):
 
             for i, (preds,preds_rcnn) in enumerate(zip(pred_rpn,pred_rcnn)):
                 # normalize
-                gt_locations,labels = self.normalize_2(preds, target_origin)
+                gt_locations,labels = self.normalize_2(preds.detach(), target_origin)
 
                 preds = preds_rcnn
                 if gt_locations is None:
                     smooth_l1_loss = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
                     classification_loss = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
                 else:
+                    gt_locations.requires_grad = False # 不求导
+                    labels.requires_grad = False
                     preds = preds.contiguous().view(-1,5 + self.num_classes)
 
                     confidence = preds[...,4:] # 包括背景（背景与类别放在一起做，yolo则是分开做）
@@ -231,10 +233,10 @@ class CascadeSSDLoss(nn.Module):
 
     def get_prior_box_2(self,preds,target_origin):
         fh, fw = preds.shape[1:-1]
-        preds = preds.contiguous().view(-1, 5 + self.num_classes).detach()
-        preds[..., :4] = self.reverse_normalize((fh, fw), preds[..., :4], target_origin)
+        preds = preds.contiguous().view(-1, 5 + self.num_classes)
+        pred_box = self.reverse_normalize((fh, fw), preds[..., :4], target_origin)
         # 过滤
-        pred_box = preds[..., :4]
+        # pred_box = preds[..., :4]
         pred_cls = preds[..., 4:]  # 包括背景
         scores, labels = torch.softmax(pred_cls, -1).max(dim=1)
         # keep = torch.nonzero(scores > self.threshold_cls and labels>0) # labels>0 跳过背景
@@ -311,7 +313,7 @@ class CascadeSSDLoss(nn.Module):
         # center_form_priors = self.get_prior_box((fh, fw), target)
         # priors_x1y1x2y2 = xywh2x1y1x2y2(center_form_priors)
         priors = self.get_prior_box_2(preds,target)
-        center_form_priors = x1y1x2y22xywh(priors)
+        center_form_priors = x1y1x2y22xywh(priors).detach()
         priors_x1y1x2y2 = priors
         gt_boxes = target["boxes"]  # (x1,y1,x2,y2)
         if len(gt_boxes)==0:return None,None

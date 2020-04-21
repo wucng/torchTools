@@ -111,7 +111,7 @@ class SSD(nn.Module):
                           # bboxAug.RandomHue(),
                           # bboxAug.RandomBlur(),
 
-                          bboxAug.Augment(advanced),
+                          # bboxAug.Augment(advanced),
                           # -------------------------------
 
                           bboxAug.ToTensor(),  # PIL --> tensor

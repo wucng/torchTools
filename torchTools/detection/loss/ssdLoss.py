@@ -271,7 +271,7 @@ class SSDLoss(nn.Module):
 
                     # """
                     # keep=py_cpu_nms(_boxes.cpu().numpy(),_scores.cpu().numpy(),self.nms_thres)
-                    keep = nms2(_boxes, _scores, nms_thres)
+                    keep = nms2(_boxes, _scores, self.nms_thres)
                     # keep = batched_nms(_boxes, _scores, _labels, self.nms_thres)
                     last_scores.extend(_scores[keep])
                     last_labels.extend(_labels[keep])

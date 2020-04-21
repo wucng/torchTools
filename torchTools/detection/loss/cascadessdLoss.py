@@ -156,8 +156,9 @@ class CascadeSSDLoss(nn.Module):
                 pred_rcnn =[pred[jj].unsqueeze(0) for pred in preds_list[1]]
 
             for i, (preds,preds_rcnn) in enumerate(zip(pred_rpn,pred_rcnn)):
-                # normalize
-                gt_locations,labels = self.normalize_2(preds.detach(), target_origin)
+                with torch.no_grad():
+                    # normalize
+                    gt_locations, labels = self.normalize_2(preds.detach(), target_origin)
 
                 preds = preds_rcnn
                 if gt_locations is None:

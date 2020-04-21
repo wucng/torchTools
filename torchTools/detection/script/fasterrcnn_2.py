@@ -174,6 +174,7 @@ class Fasterrcnn(nn.Module):
         evaluate(self.network, self.test_loader, self.device)
 
     def predict(self,path,nums=None):
+        self.network.eval()
         filenames = glob_format(path)
         preprocess = TT.Compose([
             TT.ToTensor()
@@ -269,4 +270,4 @@ if __name__ == "__main__":
 
     model()
 
-    model.predict(traindataPath,3)
+    model.predict(testdataPath,3)

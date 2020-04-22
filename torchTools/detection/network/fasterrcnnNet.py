@@ -1,6 +1,6 @@
 import torchvision
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor,FasterRCNN
-from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor
+from torchvision.models.detection.mask_rcnn import MaskRCNNPredictor,MaskRCNN
 from torchvision.models.detection.backbone_utils import BackboneWithFPN
 from torchvision.models.detection.rpn import AnchorGenerator
 from torch import nn
@@ -30,7 +30,7 @@ def FasterRCNN0(num_classes=2,pretrained=False):
     return model
 
 # 自定义
-def FasterRCNN1(num_classes=2, model_name="resnet101", pretrained=False,hideSize=64,usize = 256,use_FPN=False):
+def FasterRCNN1(num_classes=2, model_name="resnet101", pretrained=False,usize = 256,use_FPN=False):
     # super(FasterRCNN1, self).__init__()
     model_dict = {'resnet18': 512,
                   'resnet34': 512,
@@ -44,7 +44,7 @@ def FasterRCNN1(num_classes=2, model_name="resnet101", pretrained=False,hideSize
 
     assert model_name in model_dict, "%s must be in %s" % (model_name, model_dict.keys())
 
-    # backbone_size = model_dict[model_name]
+    backbone_size = model_dict[model_name]
 
     _model = torchvision.models.resnet.__dict__[model_name](pretrained=pretrained)
 
@@ -72,10 +72,10 @@ def FasterRCNN1(num_classes=2, model_name="resnet101", pretrained=False,hideSize
         # return_layers = {'layer1': 0, 'layer2': 1, 'layer3': 2, 'layer4': 3}
         return_layers = {'layer1': '0', 'layer2': '1', 'layer3': '2', 'layer4': '3'}
         in_channels_list = [
-            hideSize,      # 64 layer1 输出特征维度
-            hideSize * 2,  # 128 layer2 输出特征维度
-            hideSize * 4,  # 256 layer3 输出特征维度
-            hideSize * 8,  # 512 layer4 输出特征维度
+            backbone_size // 8,  # 64 layer1 输出特征维度
+            backbone_size // 4,  # 128 layer2 输出特征维度
+            backbone_size // 2,  # 256 layer3 输出特征维度
+            backbone_size,       # 512 layer4 输出特征维度
         ]
 
         out_channels = usize  # 每个FPN层输出维度 (这个值不固定，也可以设置为64,512等)
@@ -122,7 +122,7 @@ def get_instance_segmentation_model(num_classes,pretrained=False,hidden_layer = 
 
 # 2 - Modifying the model to add a different backbone
 # 自定义
-def get_instance_segmentation_model_cum(num_classes=2, model_name="resnet101", pretrained=False,hideSize=64,usize = 256,use_FPN=False):
+def get_instance_segmentation_model_cum(num_classes=2, model_name="resnet101", pretrained=False,usize = 256,use_FPN=False):
     # super(FasterRCNN1, self).__init__()
     model_dict = {'resnet18': 512,
                   'resnet34': 512,
@@ -136,7 +136,7 @@ def get_instance_segmentation_model_cum(num_classes=2, model_name="resnet101", p
 
     assert model_name in model_dict, "%s must be in %s" % (model_name, model_dict.keys())
 
-    # backbone_size = model_dict[model_name]
+    backbone_size = model_dict[model_name]
 
     _model = torchvision.models.resnet.__dict__[model_name](pretrained=pretrained)
 
@@ -164,10 +164,10 @@ def get_instance_segmentation_model_cum(num_classes=2, model_name="resnet101", p
         # return_layers = {'layer1': 0, 'layer2': 1, 'layer3': 2, 'layer4': 3}
         return_layers = {'layer1': '0', 'layer2': '1', 'layer3': '2', 'layer4': '3'}
         in_channels_list = [
-            hideSize,      # 64 layer1 输出特征维度
-            hideSize * 2,  # 128 layer2 输出特征维度
-            hideSize * 4,  # 256 layer3 输出特征维度
-            hideSize * 8,  # 512 layer4 输出特征维度
+            backbone_size//8,      # 64 layer1 输出特征维度
+            backbone_size//4,  # 128 layer2 输出特征维度
+            backbone_size//2,  # 256 layer3 输出特征维度
+            backbone_size,  # 512 layer4 输出特征维度
         ]
 
         out_channels = usize  # 每个FPN层输出维度 (这个值不固定，也可以设置为64,512等)

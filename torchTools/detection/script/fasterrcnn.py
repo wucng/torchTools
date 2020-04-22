@@ -342,8 +342,8 @@ if __name__ == "__main__":
     traindataPath = "../../datas/PennFudanPed"
     basePath = "./models"
 
-    model = Fasterrcnn(traindataPath, classes, "resnet50", pretrained=True, num_epochs=5,
-                       conf_thres=0.7, nms_thres=0.4, batch_size=2,usize=256,lr=3e-3,
+    model = Fasterrcnn(traindataPath, classes, "resnet50", pretrained=True, num_epochs=10,
+                       conf_thres=0.7, nms_thres=0.4, batch_size=2,usize=256,lr=5e-3,
                        use_FPN=True, basePath=basePath, useMask=False, selfmodel=True)
 
     model()

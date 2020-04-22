@@ -353,13 +353,24 @@ if __name__ == "__main__":
     """
     import torch
     from PIL import Image
+    
     model.network.eval()
+    img,_ = model.test_loader.dataset[0]
     with torch.no_grad():
-        for imgs,_ in model.test_loader:
-            detections = model.network([img.to("cuda") for img in imgs])
-            break
+        detections = model.network([img.to("cuda")])
+        
     detections
     
-    Image.fromarray(imgs[0].mul(255).permute(1, 2, 0).byte().numpy())
-    Image.fromarray(detections[0]['masks'][0, 0].mul(255).byte().cpu().numpy())
+    Image.fromarray(img.mul(255).permute(1, 2, 0).byte().numpy())
+    mask = Image.fromarray(detections[0]['masks'][0, 0].mul(255).byte().cpu().numpy())
+    
+    # let's adda color palette to the mask.
+    mask.putpalette([
+        0, 0, 0, # black background
+        255, 0, 0, # index 1 is red
+        255, 255, 0, # index 2 is yellow
+        255, 153, 0, # index 3 is orange
+    ])
+    
+    mask
     """

@@ -342,3 +342,17 @@ if __name__ == "__main__":
     model()
 
     # model.predict(testdataPath,3)
+
+    """
+    import torch
+    from PIL import Image
+    model.network.eval()
+    with torch.no_grad():
+        for imgs,_ in model.test_loader:
+            detections = model.network([img.to("cuda") for img in imgs])
+            break
+    detections
+    
+    Image.fromarray(imgs[0].mul(255).permute(1, 2, 0).byte().numpy())
+    Image.fromarray(detections[0]['masks'][0, 0].mul(255).byte().cpu().numpy())
+    """

@@ -78,7 +78,7 @@ except:
     from datasets import bboxAug
 
 
-def get_transform2(train,advanced=False):
+def get_transform(train,advanced=False):
     transforms = []
     if train:
         # during training, randomly flip the training images
@@ -88,7 +88,7 @@ def get_transform2(train,advanced=False):
 
             # ---------两者取其一--------------------
             bboxAug.RandomHorizontalFlip(),
-            bboxAug.RandomTranslate(),
+            # bboxAug.RandomTranslate(), # 如果有mask也需相应修改
             # bboxAug.RandomRotate(3),
             bboxAug.RandomBrightness(),
             bboxAug.RandomSaturation(),
@@ -105,7 +105,7 @@ def get_transform2(train,advanced=False):
 
     return T.Compose(transforms)
 
-def get_transform(train):
+def get_transform2(train):
     transforms = []
     # converts the image, a PIL image, into a PyTorch Tensor
     transforms.append(T.ToTensor())

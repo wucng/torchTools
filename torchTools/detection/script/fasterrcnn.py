@@ -62,7 +62,7 @@ try:
     from ..network import fasterrcnnNet
     from ..visual import opencv,colormap
     # from ..loss import yoloLoss
-    from ..datasets.datasets2 import PennFudanDataset,glob_format
+    from ..datasets.datasets2 import PennFudanDataset,glob_format,PascalVOCDataset
     from ..datasets import bboxAug
 except:
     from tools.engine import train_one_epoch, evaluate
@@ -73,7 +73,7 @@ except:
     sys.path.append("..")
     from network import fasterrcnnNet
     # from loss import yoloLoss
-    from datasets.datasets2 import PennFudanDataset, glob_format
+    from datasets.datasets2 import PennFudanDataset, glob_format,PascalVOCDataset
     from visual import opencv,colormap
     from datasets import bboxAug
 
@@ -124,7 +124,7 @@ class Fasterrcnn(nn.Module):
                  print_freq=10,conf_thres=0.7,nms_thres=0.4,
                  batch_size=2,test_batch_size = 2,
                  basePath="./models/",save_model="model.pt",
-                 useMask=False,selfmodel=True):
+                 useMask=False,selfmodel=True,typeOfData = "PennFudanDataset"):
         super(Fasterrcnn,self).__init__()
         # our dataset has two classes only - background and person
         # num_classes = num_classes
@@ -139,15 +139,22 @@ class Fasterrcnn(nn.Module):
         self.filter_labels = filter_labels
         self.useMask = useMask
 
-        # seed = 100
-        seed = int(time.time() * 1000)
+        seed = 100
+        # seed = int(time.time() * 1000)
         self.use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
         torch.manual_seed(seed)
         kwargs = {'num_workers': 5, 'pin_memory': True} if self.use_cuda else {}
+
+        if typeOfData == "PennFudanDataset":
+            Data = PennFudanDataset
+        elif typeOfData == "PascalVOCDataset":
+            Data = PascalVOCDataset
+        else:
+            pass
         # use our dataset and defined transformations
-        dataset = PennFudanDataset(trainDP, get_transform(train=True))
-        dataset_test = PennFudanDataset(trainDP, get_transform(train=False))
+        dataset = Data(trainDP, transforms=get_transform(train=True),classes = classes)
+        dataset_test = Data(trainDP, transforms=get_transform(train=False),classes = classes)
 
         # split the dataset in train and test set
         # torch.manual_seed(1)
@@ -161,7 +168,7 @@ class Fasterrcnn(nn.Module):
             collate_fn=utils.collate_fn,**kwargs)
 
         self.test_loader = torch.utils.data.DataLoader(
-            dataset_test, batch_size=batch_size//2, shuffle=False,
+            dataset_test, batch_size=batch_size//2 if batch_size//2 else 1, shuffle=False,
             collate_fn=utils.collate_fn,**kwargs)
 
 

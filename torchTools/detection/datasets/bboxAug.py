@@ -328,6 +328,9 @@ class RandomHorizontalFlip(object):
             bboxes[:, 0] -= box_w
             bboxes[:, 2] += box_w
 
+            if "masks" in target:
+                target["masks"] = target["masks"].flip(-1)
+
         target["boxes"]=bboxes
 
         return PIL.Image.fromarray(img), target

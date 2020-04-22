@@ -78,7 +78,7 @@ except:
     from datasets import bboxAug
 
 
-def get_transform(train,advanced=False):
+def get_transform2(train,advanced=False):
     transforms = []
     if train:
         # during training, randomly flip the training images
@@ -105,7 +105,7 @@ def get_transform(train,advanced=False):
 
     return T.Compose(transforms)
 
-def get_transform2(train):
+def get_transform(train):
     transforms = []
     # converts the image, a PIL image, into a PyTorch Tensor
     transforms.append(T.ToTensor())

@@ -5,7 +5,9 @@ some general tools for Classification ,Object detection and Object segmentation 
 ```py
 # 方式一
 # github上安装
-pip install https://github.com/wucng/torchTools/archive/master.zip
+!pip install https://github.com/wucng/torchTools/archive/master.zip
+# or
+!pip install 'git+https://github.com/wucng/torchTools.git'
 
 # 方式二
 # 源码安装

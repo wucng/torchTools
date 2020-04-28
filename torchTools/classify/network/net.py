@@ -92,6 +92,20 @@ class Resnet(BaseNet):
             Flatten(),
             nn.Linear(backbone_size, num_classes)
         )
+        # drawing weights from a zero-mean Gaussian with standard deviation of 0.01."
+        # nn.init.normal_(self._conv1.weight, std=0.01)
+        for m in self._conv1:
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
     def forward(self, x):
         x = self.backbone(x)
@@ -128,6 +142,19 @@ class Mnasnet(BaseNet):
             # nn.ReLU(),
             nn.Linear(backbone_size, num_classes))
 
+        for m in self.classifier:
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
     def forward(self, x):
         x = self.backbone(x)
         # Equivalent to global avgpool and removing H and W dimensions.
@@ -158,6 +185,19 @@ class Densenet(BaseNet):
         self.classifier = nn.Sequential(
             nn.Dropout(p=droprate),
             nn.Linear(backbone_size, num_classes))
+
+        for m in self.classifier:
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
     def forward(self, x):
         features = self.backbone(x)
@@ -190,6 +230,20 @@ class Alexnet(BaseNet):
             nn.ReLU(inplace=True),
             nn.Linear(4096, num_classes),
         )
+
+
+        for m in self._conv1:
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
     def forward(self, x):
         x = self.backbone(x)
@@ -234,6 +288,19 @@ class VGGnet(BaseNet):
             nn.Linear(4096, num_classes),
         )
 
+        for m in self._conv1:
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
     def forward(self, x):
         x = self.backbone(x)
         x = self._conv1(x)
@@ -267,6 +334,19 @@ class Squeezenet(BaseNet):
             Flatten()
         )
 
+        for m in self._conv1:
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
     def forward(self, x):
         x = self.backbone(x)
         x = self._conv1(x)
@@ -278,7 +358,7 @@ class Mobilenet(BaseNet):
         super(Mobilenet, self).__init__()
         self.pretrained = pretrained
 
-        model_dict ={'mobilenet_v2':62720,
+        model_dict ={'mobilenet_v2':1280,
                      }
 
         assert model_name in model_dict,"%s must be in %s"%(model_name,model_dict.keys())
@@ -297,6 +377,19 @@ class Mobilenet(BaseNet):
             Flatten(),
             nn.Linear(backbone_size, num_classes)
         )
+
+        for m in self._conv1:
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
 
     def forward(self, x):
         x = self.backbone(x)
@@ -346,6 +439,19 @@ class ShuffleNetV2(BaseNet):
             nn.Linear(backbone_size, num_classes)
         )
 
+        for m in self._conv1:
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.BatchNorm2d):
+                nn.init.ones_(m.weight)
+                nn.init.zeros_(m.bias)
+            elif isinstance(m, nn.Linear):
+                nn.init.normal_(m.weight, 0, 0.01)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
     def forward(self, x):
         x = self.backbone(x)
         x = self._conv1(x)
@@ -353,12 +459,12 @@ class ShuffleNetV2(BaseNet):
         return x
 
 if __name__=="__main__":
-    model = Resnet(10,'resnet18')
+    model = Mobilenet(10)
     # if hasattr(model,'parmas'):
-    if callable(model.params):
-       parmas = model.parmas()
-    else:
-        parmas = model.parameters()
+    # if callable(model.params):
+    #    parmas = model.parmas()
+    # else:
+    #     parmas = model.parameters()
 
-
-    # print(model(x).shape)
+    x = torch.rand([1,3,224,224])
+    print(model(x).shape)

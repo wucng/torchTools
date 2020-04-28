@@ -156,7 +156,7 @@ class YOLOv1Loss(nn.Module):
                 losses["loss_box"] += loss_box * 50.  # 50
                 losses["loss_clf"] += loss_clf
                 losses["loss_no_clf"] += loss_no_clf * 0.05
-                losses["loss_iou"] += loss_iou * 50.
+                losses["loss_iou"] += loss_iou
 
         return losses
 

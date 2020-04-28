@@ -60,10 +60,10 @@ class History():
 
 class YOLO(nn.Module):
     def __init__(self,trainDP=None,testDP=None,model_name="resnet18",num_features=None,
-                 pretrained=False,dropRate=0.5, usize=256,isTrain=False,
+                 pretrained=False,dropRate=0.0, usize=256,isTrain=False,freeze_at=1,
                  basePath="./",save_model = "model.pt",summaryPath="yolov1_resnet50_416",
                  epochs = 100,print_freq=1,resize:tuple = (224,224),
-                 mulScale=False,advanced=False,batch_size=2,num_anchors=2,lr=2e-3,
+                 mulScale=False,advanced=False,batch_size=2,num_anchors=2,lr=5e-4,
                  # num_classes=20,
                  typeOfData="PennFudanDataset",
                  threshold_conf=0.5,threshold_cls=0.5, #  # 0.05,0.5
@@ -150,22 +150,20 @@ class YOLO(nn.Module):
                                           collate_fn=collate_fn, **kwargs)
 
 
+        self.network = yoloNet.YOLOV1Net(num_classes, num_anchors, model_name, num_features, pretrained, dropRate,
+                                         usize, freeze_at)
         if version=="v1":
             self.loss_func = yoloLoss.YOLOv1Loss(self.device,num_anchors,num_classes,threshold_conf,
                                              threshold_cls,conf_thres,nms_thres,filter_labels,self.mulScale)
-            self.network = yoloNet.YOLOV1Net(num_classes,num_anchors,model_name,num_features,pretrained,dropRate,usize)
         elif version=="v2":
             self.loss_func = yoloLoss.YOLOv2Loss(self.device, num_anchors, num_classes, threshold_conf,
                                                  threshold_cls, conf_thres, nms_thres, filter_labels, self.mulScale)
-            self.network = yoloNet.YOLOV2Net(num_classes, num_anchors, model_name, num_features, pretrained, dropRate, usize)
         else:
             self.loss_func = yoloLoss.YOLOv3Loss(self.device, num_anchors, num_classes, threshold_conf,
                                                  threshold_cls, conf_thres, nms_thres, filter_labels, self.mulScale)
-            self.network = yoloNet.YOLOV2Net(num_classes, num_anchors, model_name, num_features, pretrained, dropRate,
-                                             usize)
         # self.network.apply(yoloNet.weights_init)
         self.network.fpn.apply(yoloNet.weights_init) # backbone 不使用
-        self.network.net.apply(yoloNet.weights_init)
+        self.network.net.apply(yoloNet.weights_init2)
 
         if self.use_cuda:
             self.network.to(self.device)
@@ -178,6 +176,7 @@ class YOLO(nn.Module):
             self.network.load_state_dict(torch.load(self.save_model))
             # self.network.load_state_dict(torch.load(self.save_model,map_location=torch.device('cpu')))
 
+        """
         # optimizer
         base_params = list(
             map(id, self.network.backbone.parameters())
@@ -192,8 +191,11 @@ class YOLO(nn.Module):
         # self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr, weight_decay=4e-05)
         # self.optimizer = torch.optim.Adam(params, weight_decay=4e-05)
         self.optimizer = optimizer.RAdam(params, weight_decay=4e-05)
-
+        
         self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1)
+        """
+        self.optimizer = optimizer.build_optimizer(self.network,lr,clip_gradients=True)
+        self.lr_scheduler = optimizer.build_lr_scheduler(self.optimizer)
 
         self.writer = SummaryWriter(os.path.join(basePath,summaryPath))
 
@@ -377,8 +379,8 @@ if __name__=="__main__":
     # traindataPath = "/home/wucong/practise/datas/PennFudanPed/"
     # testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
     # traindataPath = "D:/practice/datas/PennFudanPed/"
-    testdataPath = r"C:\practice\data\PennFudanPed\PNGImages"
-    traindataPath = r"C:\practice\data\PennFudanPed"
+    testdataPath = r"C:\practice\datas\PennFudanPed\PNGImages"
+    traindataPath = r"C:\practice\datas\PennFudanPed"
     typeOfData = "PennFudanDataset"
     """
     classes = ["bicycle", "bus", "car", "motorbike", "person"]
@@ -388,9 +390,9 @@ if __name__=="__main__":
     # """
 
     basePath = "./models/"
-    model = YOLO(traindataPath, testdataPath, "resnet18", pretrained=False, num_features=1,resize=(112,112),
-                   isTrain=False, num_anchors=3, mulScale=False, epochs=400, print_freq=40,dropRate=0.5,
-                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,
+    model = YOLO(traindataPath, testdataPath, "resnet18", pretrained=False, num_features=1,resize=(96,96),
+                   isTrain=True, num_anchors=2, mulScale=False, epochs=400, print_freq=40,dropRate=0.0,
+                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,freeze_at=0,
                    conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,version="v1")
 
     model()

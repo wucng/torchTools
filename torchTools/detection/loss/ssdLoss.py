@@ -9,6 +9,8 @@ except:
 """
 import sys,os
 from .nms_pytorch import nms,nms2
+from .focalLoss import smooth_l1_loss_jit,giou_loss_jit,\
+    sigmoid_focal_loss_jit,softmax_focal_loss_jit
 
 from torch import nn
 import torch
@@ -49,7 +51,7 @@ class SSDLoss(nn.Module):
         else:
             return self.compute_loss(preds, targets,useFocal=True)
 
-    def compute_loss(self,preds_list, targets_origin,useFocal=False,alpha=1.0,gamma=2):
+    def compute_loss(self,preds_list, targets_origin,useFocal=False,alpha=0.2,gamma=2):
         """
         :param preds:
                 if mulScale: # 使用多尺度（2个特征为例,batch=2）
@@ -82,26 +84,30 @@ class SSDLoss(nn.Module):
                     classification_loss = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
                 else:
                     preds = preds.contiguous().view(-1,5 + self.num_classes)
+                    preds[..., :2] = torch.sigmoid(preds[..., :2])
 
                     confidence = preds[...,4:] # 包括背景（背景与类别放在一起做，yolo则是分开做）
                     predicted_locations = preds[...,:4]
+
                     with torch.no_grad():
                         # derived from cross_entropy=sum(log(p))
                         loss = -F.log_softmax(confidence, dim=1)[:, 0]  # 计算背景置信度loss，后续需按loss从大到小排序，选择更新的mask
                         mask = hard_negative_mining(loss, labels, self.neg_pos_ratio)
 
                     confidence = confidence[mask, :]
-                    classification_loss = F.cross_entropy(confidence, labels[mask], reduction='sum')
+                    if useFocal:
+                        classification_loss = softmax_focal_loss_jit(confidence, labels[mask], alpha, gamma,
+                                                                     reduction='sum')
+                    else:
+                        classification_loss = F.cross_entropy(confidence, labels[mask], reduction='sum')
+
 
                     # 定位loss 只更新正样本的
                     pos_mask = labels > 0
                     predicted_locations = predicted_locations[pos_mask, :]
                     gt_locations = gt_locations[pos_mask, :]
-                    smooth_l1_loss = F.smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')
-
-                    if useFocal:
-                        classification_loss = alpha * (1 - torch.exp(-classification_loss)) ** gamma * classification_loss
-                        smooth_l1_loss = alpha * (1 - torch.exp(-smooth_l1_loss)) ** gamma * smooth_l1_loss
+                    # smooth_l1_loss = F.smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')
+                    smooth_l1_loss = smooth_l1_loss_jit(predicted_locations, gt_locations,2e-5, reduction='sum')
 
 
                 losses["loss_box"] += smooth_l1_loss * 5.
@@ -186,6 +192,7 @@ class SSDLoss(nn.Module):
         for idx, preds in enumerate(preds_list):
             bs, fh, fw = preds.shape[:-1]
             preds = preds.contiguous().view(bs,-1, 5 + self.num_classes)
+            preds[...,:2] = torch.sigmoid(preds[...,:2])
 
             for i in range(bs):
                 targets = targets_origin[i]

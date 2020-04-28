@@ -8,6 +8,7 @@ import torch.nn as nn
 import torchvision
 from collections import OrderedDict
 import numpy as np
+from fvcore.nn.weight_init import c2_xavier_fill,c2_msra_fill
 
 # __all__ = ['Resnet', 'Mnasnet', 'Densenet',
 #            'Alexnet','VGGnet','Squeezenet',
@@ -19,18 +20,41 @@ class Flatten(nn.Module):
     def forward(self, x):
         return torch.flatten(x,1)
 
-def weights_init(m):
-    classname = m.__class__.__name__
-    if classname.find('Conv') != -1:
-        nn.init.normal_(m.weight.data, 0.0, 0.02)
-    elif classname.find('BatchNorm') != -1:
-        nn.init.normal_(m.weight.data, 1.0, 0.02)
-        nn.init.constant_(m.bias.data, 0)
+def weights_init(model):
+    # weight initialization
+    for m in model.modules():
+        if isinstance(m, nn.Conv2d):
+            # nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+            # if m.bias is not None:
+            #     nn.init.zeros_(m.bias)
+            # c2_msra_fill(m)
+            c2_xavier_fill(m)
+        elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+            nn.init.ones_(m.weight)
+            nn.init.zeros_(m.bias)
+        elif isinstance(m, nn.Linear):
+            nn.init.normal_(m.weight, 0, 0.01)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
 
+def weights_init2(model):
+    # weight initialization
+    for m in model.modules():
+        if isinstance(m, nn.Conv2d):
+            nn.init.normal_(m.weight, std=0.01)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
+        elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+            nn.init.ones_(m.weight)
+            nn.init.zeros_(m.bias)
+        elif isinstance(m, nn.Linear):
+            nn.init.normal_(m.weight, 0, 0.01)
+            if m.bias is not None:
+                nn.init.zeros_(m.bias)
 
 # model resnet
 class BackBoneNet(nn.Module):
-    def __init__(self,model_name="resnet101", pretrained=False,dropRate=0.5):
+    def __init__(self,model_name="resnet101", pretrained=False,dropRate=0.5,freeze_at:int=0):
         super(BackBoneNet, self).__init__()
         self.pretrained = pretrained
         # self.dropRate = dropRate
@@ -59,12 +83,22 @@ class BackBoneNet(nn.Module):
             ('maxpool1', _model.maxpool),
         ]))
 
+        layer = {0:layer0,1:_model.layer1,2:_model.layer2,3:_model.layer3,4:_model.layer4}
+        while True:
+            if freeze_at in layer: # 冻结某层参数
+                layer[freeze_at]=freeze(layer[freeze_at])
+                freeze_at -= 1
+            else:
+                break
+
         self.backbone = nn.ModuleList()
-        self.backbone.append(layer0)
-        self.backbone.append(nn.Sequential(_model.layer1,nn.Dropout(dropRate)))
-        self.backbone.append(nn.Sequential(_model.layer2,nn.Dropout(dropRate)))
-        self.backbone.append(nn.Sequential(_model.layer3,nn.Dropout(dropRate)))
-        self.backbone.append(nn.Sequential(_model.layer4,nn.Dropout(dropRate)))
+        # self.backbone.append(layer[0])
+        # self.backbone.append(nn.Sequential(layer[1],nn.Dropout(dropRate)))
+        # self.backbone.append(nn.Sequential(layer[2],nn.Dropout(dropRate)))
+        # self.backbone.append(nn.Sequential(layer[3],nn.Dropout(dropRate)))
+        # self.backbone.append(nn.Sequential(layer[4],nn.Dropout(dropRate)))
+        for i in range(len(layer)):
+            self.backbone.append(layer[i])
 
         self.num_features = len(self.backbone)-1
 
@@ -76,9 +110,102 @@ class BackBoneNet(nn.Module):
                 out.append(x)
         return out
 
+def freeze(model:nn.Module):
+    for p in model.parameters():
+        p.requires_grad = False
+    convert_frozen_batchnorm(model)
+    return model
+
+def convert_frozen_batchnorm(module:nn.Module):
+    """
+            Convert BatchNorm/SyncBatchNorm in module into FrozenBatchNorm.
+
+            Args:
+                module (torch.nn.Module):
+
+            Returns:
+                If module is BatchNorm/SyncBatchNorm, returns a new module.
+                Otherwise, in-place convert module and return it.
+
+            Similar to convert_sync_batchnorm in
+            https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/batchnorm.py
+            """
+    bn_module = nn.modules.batchnorm
+    bn_module = (bn_module.BatchNorm2d, bn_module.SyncBatchNorm)
+    res = module
+    if isinstance(module, bn_module):
+        # res = module.num_features
+        if module.affine:
+            res.weight.data = module.weight.data.clone().detach()
+            res.bias.data = module.bias.data.clone().detach()
+        res.running_mean.data = module.running_mean.data
+        res.running_var.data = module.running_var.data
+        res.eps = module.eps
+    else:
+        for name, child in module.named_children():
+            new_child = convert_frozen_batchnorm(child)
+            if new_child is not child:
+                res.add_module(name, new_child)
+    return res
+
+
 class FPNNet(nn.Module):
     def __init__(self,backbone_size=2048,num_features=4, usize=256):
         super(FPNNet, self).__init__()
+        self.num_features = num_features
+
+        self.net = nn.ModuleList()
+        for i in range(num_features):
+            m = nn.Sequential(
+                nn.Conv2d(backbone_size//2**i, usize, 1),
+                # nn.BatchNorm2d(usize),
+                # nn.ReLU()
+                # nn.LeakyReLU(0.2)
+            )
+
+            p = nn.Sequential(
+                nn.Conv2d(usize, usize, 3, stride=1, padding=1),
+                # nn.BatchNorm2d(usize),
+                # nn.ReLU()
+                # nn.LeakyReLU(0.2)
+            )
+
+            # if i>0:
+            #     upsample = nn.Sequential(
+            #         nn.ConvTranspose2d(backbone_size//2**(i-1),usize,3,2,1,1),
+            #         # nn.BatchNorm2d(usize),
+            #         # nn.LeakyReLU(0.2),
+            #     )
+            # else:
+            upsample = None
+
+            tmp = nn.ModuleList()
+            tmp.append(m)
+            tmp.append(p)
+            tmp.append(upsample)
+            self.net.append(tmp)
+
+    def forward(self, x_list):
+        x_list = x_list[::-1] # 反转
+        out = []
+        out_m = []
+        for i in range(self.num_features):
+            m,p,upsample=self.net[i]
+            m_x = m(x_list[i])
+            if i>0:
+                m_x += F.interpolate(out_m[-1],scale_factor=(2,2),mode="nearest")
+                # m_x += upsample(out_m[-1])
+            p_x = p(m_x)
+
+            out.append(p_x)
+            out_m.append(m_x)
+
+        return out[::-1] # 反转
+
+
+class FPNNetCH(nn.Module):
+    def __init__(self,backbone_size=2048,num_features=4, usize=256):
+        super(FPNNetCH, self).__init__()
         self.num_features = num_features
 
         self.net = nn.ModuleList()
@@ -287,3 +414,7 @@ class XNet(nn.Module):
         new_out.append(outs[-1])
 
         return new_out
+
+if __name__=="__main__":
+    backbone = BackBoneNet("resnet18")
+    backbone.apply(weights_init)

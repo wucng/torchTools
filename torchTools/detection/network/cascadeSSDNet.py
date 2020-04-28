@@ -31,13 +31,13 @@ class CascadeSSDNet(nn.Module):
         for i in range(self.num_features):
             convp = nn.Sequential(
                 nn.Dropout(dropRate),
-                # nn.Conv2d(usize, usize, kernel_size=3, stride=1, padding=1),
-                # nn.BatchNorm2d(usize),
-                # nn.LeakyReLU(),
-                nn.Conv2d(usize, num_anchors * (5 + num_classes), kernel_size=3, stride=1, padding=1),
+                nn.Conv2d(usize, usize, kernel_size=3, stride=1, padding=1),
+                nn.BatchNorm2d(usize),
+                nn.LeakyReLU(),
+                nn.Conv2d(usize, num_anchors * (5 + num_classes), kernel_size=1, stride=1),
                 # 每个box对应一个类别
                 # 每个anchor对应4个坐标
-                nn.BatchNorm2d(num_anchors * (5 + num_classes)),
+                # nn.BatchNorm2d(num_anchors * (5 + num_classes)),
                 # nn.Sigmoid()
             )
 

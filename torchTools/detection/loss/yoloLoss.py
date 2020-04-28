@@ -17,6 +17,8 @@ import torch
 from torch.nn import functional as F
 import random
 import numpy as np
+from .focalLoss import smooth_l1_loss_jit,giou_loss_jit,\
+    sigmoid_focal_loss_jit,softmax_focal_loss_jit
 
 
 class YOLOv1Loss(nn.Module):
@@ -48,7 +50,7 @@ class YOLOv1Loss(nn.Module):
         else:
             return self.compute_loss(preds, targets,useFocal=True)
 
-    def compute_loss(self,preds_list, targets_origin,useFocal=False,alpha=1.0,gamma=2):
+    def compute_loss(self,preds_list, targets_origin,useFocal=True,alpha=0.2,gamma=2):
         """
         :param preds:
                 if mulScale: # 使用多尺度（2个特征为例,batch=2）
@@ -87,43 +89,55 @@ class YOLOv1Loss(nn.Module):
                     loss_clf = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
                     loss_no_clf = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
                 else:
-
-                    # preds = preds.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
-                    # targets = targets.contiguous().view(-1, self.num_anchors * (5 + self.num_classes))
-
-                    preds = preds.contiguous().view(-1,5 + self.num_classes)
-                    targets = targets.contiguous().view(-1, 5 + self.num_classes)
-
-                    index = targets[..., 4] == 1
-                    no_index = targets[..., 4] != 1
-                    has_obj = preds[index]
-                    no_obj = preds[no_index]
-                    targ_obj = targets[index]
-
-                    loss_conf = F.binary_cross_entropy(has_obj[..., 4], torch.ones_like(has_obj[..., 4]).detach(),
-                                                       reduction="sum")  # 对应目标
-
-                    loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
-                                                          reduction="sum")  # 对应背景
-                    # boxes loss
-                    # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
-                    loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
-
-                    # classify loss
-                    # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
-                    loss_clf = F.binary_cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
-                    # loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
-
-                    # no obj classify loss
-                    loss_no_clf = F.mse_loss(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
-                    # loss_no_clf = F.binary_cross_entropy(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
-
                     if useFocal:
-                        loss_conf = alpha * (1 - torch.exp(-loss_conf)) ** gamma * loss_conf
-                        loss_no_conf = alpha * (1 - torch.exp(-loss_no_conf)) ** gamma * loss_no_conf
-                        # loss_box = alpha * (1 - torch.exp(-loss_box)) ** gamma * loss_box
-                        loss_clf = alpha * (1 - torch.exp(-loss_clf)) ** gamma * loss_clf
-                        loss_no_clf = alpha * (1 - torch.exp(-loss_no_clf)) ** gamma * loss_no_clf
+                        # preds = F.sigmoid(preds)  # 不执行
+                        preds = preds.contiguous().view(-1, 5 + self.num_classes)
+                        targets = targets.contiguous().view(-1, 5 + self.num_classes)
+
+                        index = targets[..., 4] == 1
+                        no_index = targets[..., 4] != 1
+                        has_obj = preds[index]
+                        no_obj = preds[no_index]
+                        targ_obj = targets[index]
+
+                        loss_conf = sigmoid_focal_loss_jit(has_obj[..., 4],torch.ones_like(has_obj[..., 4]).detach(),
+                                                           alpha,gamma,reduction="sum")
+                        loss_no_conf = sigmoid_focal_loss_jit(no_obj[..., 4],torch.zeros_like(no_obj[..., 4]).detach(),
+                                                              alpha,gamma,reduction="sum")
+                        loss_box = smooth_l1_loss_jit(torch.sigmoid(has_obj[..., :4]), targ_obj[..., :4].detach(),2e-5,reduction="sum")
+                        loss_clf = sigmoid_focal_loss_jit(has_obj[..., 5:], targ_obj[..., 5:].detach(),
+                                                          alpha,gamma,reduction="sum")
+                        loss_no_clf = F.mse_loss(torch.sigmoid(no_obj[..., 5:]), torch.zeros_like(no_obj[..., 5:]).detach(),
+                                                 reduction="sum")
+                    else:
+                        preds = F.sigmoid(preds) # ??????????????????????
+                        preds = preds.contiguous().view(-1,5 + self.num_classes)
+                        targets = targets.contiguous().view(-1, 5 + self.num_classes)
+
+                        index = targets[..., 4] == 1
+                        no_index = targets[..., 4] != 1
+                        has_obj = preds[index]
+                        no_obj = preds[no_index]
+                        targ_obj = targets[index]
+
+                        loss_conf = F.binary_cross_entropy(has_obj[..., 4], torch.ones_like(has_obj[..., 4]).detach(),
+                                                           reduction="sum")  # 对应目标
+
+                        loss_no_conf = F.binary_cross_entropy(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
+                                                              reduction="sum")  # 对应背景
+                        # boxes loss
+                        # loss_box = F.mse_loss(has_obj[...,:4],targ_obj[...,:4].detach(),reduction="sum")
+                        loss_box = F.smooth_l1_loss(has_obj[..., :4], targ_obj[..., :4].detach(), reduction="sum")
+
+                        # classify loss
+                        # loss_clf = F.mse_loss(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                        loss_clf = F.binary_cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].detach(), reduction="sum")
+                        # loss_clf = F.cross_entropy(has_obj[..., 5:], targ_obj[..., 5:].argmax(-1), reduction="sum")
+
+                        # no obj classify loss
+                        loss_no_clf = F.mse_loss(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
+                        # loss_no_clf = F.binary_cross_entropy(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
+
 
 
                 losses["loss_conf"] += loss_conf
@@ -198,7 +212,7 @@ class YOLOv1Loss(nn.Module):
         for idx, preds in enumerate(preds_list):
             bs, fh, fw = preds.shape[:-1]
             preds = preds.contiguous().view(bs,-1, self.num_anchors, 5 + self.num_classes)
-
+            preds = F.sigmoid(preds)
             for i in range(bs):
                 targets = targets_origin[i]
                 new_preds = preds[i]

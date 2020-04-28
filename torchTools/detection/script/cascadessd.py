@@ -61,7 +61,7 @@ class History():
 
 class CascadeSSD(nn.Module):
     def __init__(self,trainDP=None,testDP=None,model_name="resnet18",num_features=None,
-                 pretrained=False,dropRate=0.5, usize=256,isTrain=False,useRCNN=False,
+                 pretrained=False,dropRate=0.0, usize=256,isTrain=False,useRCNN=False,
                  basePath="./",save_model = "model.pt",summaryPath="yolov1_resnet50_416",
                  epochs = 100,print_freq=1,resize:tuple = (224,224),
                  mulScale=False,advanced=False,batch_size=2,num_anchors=6,lr=2e-3,
@@ -152,8 +152,8 @@ class CascadeSSD(nn.Module):
 
         # self.network.apply(cascadeSSDNet.weights_init)
         self.network.fpn.apply(cascadeSSDNet.weights_init) # backbone 不使用
-        self.network.rpnNet.apply(cascadeSSDNet.weights_init)
-        self.network.rcnnNet.apply(cascadeSSDNet.weights_init)
+        self.network.rpnNet.apply(cascadeSSDNet.weights_init2)
+        self.network.rcnnNet.apply(cascadeSSDNet.weights_init2)
 
         if self.use_cuda:
             self.network.to(self.device)

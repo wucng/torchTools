@@ -184,8 +184,8 @@ def evaluate2(model,loss_func, data_loader, device,mulScale):
             image = list(img.to(device) for img in image)
 
         # targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-        new_targets = [{k: v.to(device) for k, v in targ.items() if k not in ["boxes","labels"]} for targ in targets]
-        targets = [{k: v.to(device) for k, v in targ.items()} for targ in targets]
+        targets = [{k: v.to(device) for k, v in targ.items() if k not in ["boxes","labels"]} for targ in targets]
+        # targets = [{k: v.to(device) for k, v in targ.items()} for targ in targets]
 
         torch.cuda.synchronize()
         model_time = time.time()
@@ -194,9 +194,20 @@ def evaluate2(model,loss_func, data_loader, device,mulScale):
             output = [model(img.unsqueeze(0)) for img in image]
         else:
             output = model(image)
-        outputs = loss_func(output, new_targets)
+        outputs = loss_func(output, targets)
 
-        outputs = [{k: torch.stack(v).to(cpu_device) for k, v in t.items()} for t in outputs]
+        # outputs = [{k: torch.stack(v).to(cpu_device) for k, v in t.items()} for t in outputs]
+        outputs_1 = []
+        for t in outputs:
+            if t is None:
+                outputs_1.append({"boxes":torch.as_tensor([[0,0,0,0]]),
+                                  "labels":torch.as_tensor([0],dtype=torch.long),
+                                  "scores":torch.as_tensor([0.])})
+            else:
+                for k, v in t.items():
+                    outputs_1.append({k: torch.stack(v).to(cpu_device)})
+        outputs = outputs_1
+        del outputs_1
 
         model_time = time.time() - model_time
 

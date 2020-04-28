@@ -121,9 +121,6 @@ class YOLO(nn.Module):
                           bboxAug.Normalize() # tensor --> tensor
                       ]),classes=classes)
 
-            self.train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
-                                           collate_fn=collate_fn, **kwargs)
-
 
             if testDP is not None:
                 test_dataset = Data(testDP,
@@ -133,8 +130,24 @@ class YOLO(nn.Module):
                                         bboxAug.Normalize()  # tensor --> tensor
                                     ]),classes=classes)
 
-                self.test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
-                                              collate_fn=collate_fn, **kwargs)
+            else:
+                test_dataset = Data(trainDP,
+                                    transforms=bboxAug.Compose([
+                                        bboxAug.Pad(), bboxAug.Resize(resize, False),
+                                        bboxAug.ToTensor(),  # PIL --> tensor
+                                        bboxAug.Normalize()  # tensor --> tensor
+                                    ]), classes=classes)
+
+                indices = torch.randperm(len(train_dataset)).tolist()
+                train_dataset = torch.utils.data.Subset(train_dataset, indices[:-50])
+                test_dataset = torch.utils.data.Subset(test_dataset, indices[-50:])
+
+            self.train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
+                                           collate_fn=collate_fn, **kwargs)
+
+            self.test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
+                                          collate_fn=collate_fn, **kwargs)
+
 
             if predDP is not None:
                 pred_dataset = datasets.ValidDataset(predDP,

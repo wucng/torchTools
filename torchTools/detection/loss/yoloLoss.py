@@ -29,7 +29,7 @@ class YOLOv1Loss(nn.Module):
                  conf_thres=0.8,
                  nms_thres=0.4,
                  filter_labels:list = [],
-                 mulScale=False):
+                 mulScale=False,useFocal=False):
         super(YOLOv1Loss, self).__init__()
         self.device = device
         self.num_anchors = num_anchors
@@ -40,6 +40,7 @@ class YOLOv1Loss(nn.Module):
         self.conf_thres = conf_thres
         self.nms_thres = nms_thres
         self.filter_labels = filter_labels
+        self.useFocal = useFocal
 
     def forward(self,preds,targets):
         if "boxes" not in targets[0]:
@@ -48,7 +49,7 @@ class YOLOv1Loss(nn.Module):
             results = [self.apply_nms(result) for result in results]
             return results
         else:
-            return self.compute_loss(preds, targets,useFocal=True)
+            return self.compute_loss(preds, targets,useFocal=self.useFocal)
 
     def compute_loss(self,preds_list, targets_origin,useFocal=True,alpha=0.2,gamma=2):
         """
@@ -420,7 +421,11 @@ class YOLOv2Loss(YOLOv1Loss):
                  conf_thres=0.8,
                  nms_thres=0.4,
                  filter_labels: list = [],
-                 mulScale=False,):
+                 mulScale=False,useFocal=False,method=1):
+
+        super(YOLOv2Loss, self).__init__(device, num_anchors,
+                                         num_classes, threshold_conf, threshold_cls,
+                                         conf_thres, nms_thres, filter_labels, mulScale, useFocal)
 
         # 缩放到输入图像大小上 格式（w,h）
         # self.PreBoxSize = torch.as_tensor([(1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053),
@@ -434,11 +439,13 @@ class YOLOv2Loss(YOLOv1Loss):
         # self.mse_loss = nn.MSELoss(reduction='sum')
         # self.bce_loss = nn.BCELoss(reduction='sum')
 
-        num_anchors = self.PreBoxSize.size(0)
+        self.num_anchors = self.PreBoxSize.size(0)
 
-        super(YOLOv2Loss, self).__init__(device, num_anchors,
-                                         num_classes, threshold_conf, threshold_cls,
-                                         conf_thres, nms_thres, filter_labels, mulScale)
+
+        if method:
+            self.normalize = self.normalize2
+        else:
+            self.normalize = self.normalize3
 
     def forward(self,preds,targets):
         if "boxes" not in targets[0]:
@@ -447,9 +454,9 @@ class YOLOv2Loss(YOLOv1Loss):
             results = [self.apply_nms(result) for result in results]
             return results
         else:
-            return self.compute_loss(preds, targets,useFocal=True)
+            return self.compute_loss(preds, targets,useFocal=self.useFocal)
 
-    def normalize(self, featureShape, target):
+    def normalize2(self, featureShape, target):
         """不做筛选所有的anchor都参与计算"""
         grid_ceil_h, grid_ceil_w = featureShape
         h, w = target["resize"]
@@ -504,7 +511,7 @@ class YOLOv2Loss(YOLOv1Loss):
 
         return result
 
-    def normalize2(self, featureShape, target,thred_iou=0.5):
+    def normalize3(self, featureShape, target,thred_iou=0.5):
         """做筛选anchor参与计算(根据IOU筛选)"""
         grid_ceil_h, grid_ceil_w = featureShape
         h, w = target["resize"]

@@ -1,12 +1,12 @@
 try:
-    from .tools.engine import train_one_epoch, evaluate
+    from .tools.engine import train_one_epoch2, evaluate
     from ..network import yoloNet
     from ..loss import yoloLoss
     from ..datasets import datasets, bboxAug
     from ..visual import opencv
     from ..optm import optimizer
 except:
-    from tools.engine import train_one_epoch, evaluate
+    from tools.engine import train_one_epoch2, evaluate
     import sys
     sys.path.append("..")
     from network import yoloNet
@@ -64,7 +64,7 @@ class YOLO(nn.Module):
     def __init__(self,trainDP=None,testDP=None,model_name="resnet18",num_features=None,
                  pretrained=False,dropRate=0.0, usize=256,isTrain=False,freeze_at=1,
                  basePath="./",save_model = "model.pt",summaryPath="yolov1_resnet50_416",
-                 epochs = 100,print_freq=1,resize:tuple = (224,224),
+                 epochs = 100,print_freq=1,resize:tuple = (224,224),useFocal=False,method=1,
                  mulScale=False,advanced=False,batch_size=2,num_anchors=2,lr=5e-4,
                  # num_classes=20,
                  typeOfData="PennFudanDataset",
@@ -146,14 +146,16 @@ class YOLO(nn.Module):
                                           collate_fn=collate_fn, **kwargs)
 
 
-        self.network = yoloNet.YOLOV1Net(num_classes, num_anchors, model_name, num_features, pretrained, dropRate,
-                                         usize, freeze_at)
+
         if version=="v1":
             self.loss_func = yoloLoss.YOLOv1Loss(self.device,num_anchors,num_classes,threshold_conf,
-                                             threshold_cls,conf_thres,nms_thres,filter_labels,self.mulScale)
+                                             threshold_cls,conf_thres,nms_thres,filter_labels,self.mulScale,useFocal)
         else:
             self.loss_func = yoloLoss.YOLOv2Loss(self.device, num_anchors, num_classes, threshold_conf,
-                                                 threshold_cls, conf_thres, nms_thres, filter_labels, self.mulScale)
+                                                 threshold_cls, conf_thres, nms_thres, filter_labels, self.mulScale,useFocal,method)
+
+        self.network = yoloNet.YOLOV1Net(num_classes, self.loss_func.num_anchors, model_name, num_features, pretrained, dropRate,
+                                         usize, freeze_at)
 
         # self.network.apply(yoloNet.weights_init)
         self.network.fpn.apply(yoloNet.weights_init) # backbone 不使用
@@ -227,7 +229,9 @@ class YOLO(nn.Module):
 
     def train2(self,epoch):
             # train for one epoch, printing every 10 iterations
-            train_one_epoch(self.network, self.optimizer, self.train_loader, self.device, epoch, self.print_freq)
+            # train_one_epoch(self.network, self.optimizer, self.train_loader, self.device, epoch, self.print_freq)
+            train_one_epoch2(self.network,self.loss_func,self.optimizer,self.train_loader,
+                             self.device,epoch,self.print_freq,self.use_cuda,self.mulScale)
 
     def eval(self):
         # evaluate on the test dataset
@@ -403,6 +407,6 @@ if __name__=="__main__":
     model = YOLO(traindataPath, testdataPath, "resnet18", pretrained=False, num_features=1,resize=(96,96),
                    isTrain=True, num_anchors=2, mulScale=False, epochs=400, print_freq=40,dropRate=0.0,
                    basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,freeze_at=0,
-                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,version="v1")
+                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,version="v2")
 
     model()

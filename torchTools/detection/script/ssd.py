@@ -1,12 +1,12 @@
 try:
-    from .tools.engine import train_one_epoch, evaluate
+    from .tools.engine import train_one_epoch2, evaluate
     from ..network import ssdNet
     from ..loss import ssdLoss
     from ..datasets import datasets, bboxAug
     from ..visual import opencv
     from ..optm import optimizer
 except:
-    from tools.engine import train_one_epoch, evaluate
+    from tools.engine import train_one_epoch2, evaluate
     import sys
     sys.path.append("..")
     from network import ssdNet
@@ -222,7 +222,9 @@ class SSD(nn.Module):
 
     def train2(self,epoch):
             # train for one epoch, printing every 10 iterations
-            train_one_epoch(self.network, self.optimizer, self.train_loader, self.device, epoch, self.print_freq)
+            # train_one_epoch(self.network, self.optimizer, self.train_loader, self.device, epoch, self.print_freq)
+            train_one_epoch2(self.network, self.loss_func, self.optimizer, self.train_loader,
+                             self.device, epoch, self.print_freq, self.use_cuda, self.mulScale)
 
     def eval(self):
         # evaluate on the test dataset

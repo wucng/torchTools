@@ -243,7 +243,7 @@ class SSD(nn.Module):
     def eval(self):
         # evaluate on the test dataset
         # evaluate(self.network, self.test_loader, self.device)
-        evaluate2(self.network, self.loss_func, self.test_loader, self.device)
+        evaluate2(self.network, self.loss_func, self.test_loader, self.device,self.mulScale)
 
     def train(self,epoch):
         self.network.train()

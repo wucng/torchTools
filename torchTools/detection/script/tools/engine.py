@@ -163,7 +163,7 @@ def evaluate(model, data_loader, device):
 
 
 @torch.no_grad()
-def evaluate2(model,loss_func, data_loader, device):
+def evaluate2(model,loss_func, data_loader, device,mulScale):
     n_threads = torch.get_num_threads()
     # FIXME remove this and make paste_masks_in_image run on the GPU
     torch.set_num_threads(1)
@@ -177,23 +177,27 @@ def evaluate2(model,loss_func, data_loader, device):
     coco_evaluator = CocoEvaluator(coco, iou_types)
 
     for image, targets in metric_logger.log_every(data_loader, 100, header):
-        if isinstance(image,(tuple,list)):
-            image = list(img.to(device) for img in image)
-        else:
+        if not mulScale:
+            image = torch.stack(image, 0)
             image = image.to(device)
+        else:
+            image = list(img.to(device) for img in image)
+
         # targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
-        targets = [{k: v.to(self.device) for k, v in targ.items() if k != "path"} for targ in target]
+        new_targets = [{k: v.to(device) for k, v in targ.items() if k not in ["boxes","labels"]} for targ in targets]
+        targets = [{k: v.to(device) for k, v in targ.items()} for targ in targets]
 
         torch.cuda.synchronize()
         model_time = time.time()
 
-        if isinstance(image, (tuple, list)):
+        if mulScale:
             output = [model(img.unsqueeze(0)) for img in image]
         else:
             output = model(image)
-        outputs = loss_func(output, targets)
+        outputs = loss_func(output, new_targets)
 
-        outputs = [{k: v.to(cpu_device) for k, v in t.items()} for t in outputs]
+        outputs = [{k: torch.stack(v).to(cpu_device) for k, v in t.items()} for t in outputs]
+
         model_time = time.time() - model_time
 
         res = {target["image_id"].item(): output for target, output in zip(targets, outputs)}

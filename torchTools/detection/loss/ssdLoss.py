@@ -66,8 +66,8 @@ class SSDLoss(nn.Module):
         """
         losses = {
             "loss_box": 0,
-            "loss_clf": 0,
-            "loss_iou":0
+            "loss_clf": 0#,
+            # "loss_iou":0
         }
 
         for jj in range(len(targets_origin)):
@@ -85,7 +85,7 @@ class SSDLoss(nn.Module):
                 if gt_locations is None:
                     smooth_l1_loss = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
                     classification_loss = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
-                    loss_iou = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                    # loss_iou = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
                 else:
                     preds = preds.contiguous().view(-1,5 + self.num_classes)
                     preds[..., :2] = torch.sigmoid(preds[..., :2])
@@ -113,12 +113,13 @@ class SSDLoss(nn.Module):
                     # smooth_l1_loss = F.smooth_l1_loss(predicted_locations, gt_locations, reduction='sum')
                     smooth_l1_loss = smooth_l1_loss_jit(predicted_locations, gt_locations,2e-5, reduction='sum')
 
-                    loss_iou = giou_loss_jit(xywh2x1y1x2y2(predicted_locations),xywh2x1y1x2y2(gt_locations),reduction='sum')
+                    # 计算的h,w 会出现 负值 计算giou_loss报错
+                    # loss_iou = giou_loss_jit(xywh2x1y1x2y2(predicted_locations),xywh2x1y1x2y2(gt_locations),reduction='sum')
 
 
                 losses["loss_box"] += smooth_l1_loss * 5.
                 losses["loss_clf"] += classification_loss
-                losses["loss_iou"] += loss_iou * 5.
+                # losses["loss_iou"] += loss_iou * 5.
 
         return losses
 

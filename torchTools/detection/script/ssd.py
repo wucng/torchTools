@@ -1,10 +1,12 @@
 try:
+    from .tools.engine import train_one_epoch, evaluate
     from ..network import ssdNet
     from ..loss import ssdLoss
     from ..datasets import datasets, bboxAug
     from ..visual import opencv
     from ..optm import optimizer
 except:
+    from tools.engine import train_one_epoch, evaluate
     import sys
     sys.path.append("..")
     from network import ssdNet
@@ -192,6 +194,7 @@ class SSD(nn.Module):
     def forward(self):
         if self.isTrain:
             for epoch in range(self.epochs):
+                """
                 loss_record = self.train(epoch)
                 # if epoch>0 and epoch%30==0:
                 #     self.test(3)
@@ -205,12 +208,25 @@ class SSD(nn.Module):
                     if key not in self.history.history:
                         self.history.history[key] = []
                     self.history.history[key].append(value)
-
+                """
+                self.train2(epoch)
+                # update the learning rate
+                self.lr_scheduler.step()
+                torch.save(self.network.state_dict(), self.save_model)
+                # """
         else:
             self.test()
 
     def fit(self):
         pass
+
+    def train2(self,epoch):
+            # train for one epoch, printing every 10 iterations
+            train_one_epoch(self.network, self.optimizer, self.train_loader, self.device, epoch, self.print_freq)
+
+    def eval(self):
+        # evaluate on the test dataset
+        evaluate(self.network, self.test_loader, self.device)
 
     def train(self,epoch):
         self.network.train()

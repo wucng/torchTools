@@ -1,10 +1,12 @@
 try:
+    from .tools.engine import train_one_epoch, evaluate
     from ..network import yoloNet
     from ..loss import yoloLoss
     from ..datasets import datasets, bboxAug
     from ..visual import opencv
     from ..optm import optimizer
 except:
+    from tools.engine import train_one_epoch, evaluate
     import sys
     sys.path.append("..")
     from network import yoloNet
@@ -78,12 +80,6 @@ class YOLO(nn.Module):
         self.mulScale = mulScale
         self.classes = classes
         num_classes = len(self.classes)
-        if version=='v2':
-            num_anchors = 5
-        elif version=='v3':
-            num_anchors = 3
-        else:
-            pass
 
         # seed = 100
         seed = int(time.time() * 1000)
@@ -155,12 +151,10 @@ class YOLO(nn.Module):
         if version=="v1":
             self.loss_func = yoloLoss.YOLOv1Loss(self.device,num_anchors,num_classes,threshold_conf,
                                              threshold_cls,conf_thres,nms_thres,filter_labels,self.mulScale)
-        elif version=="v2":
+        else:
             self.loss_func = yoloLoss.YOLOv2Loss(self.device, num_anchors, num_classes, threshold_conf,
                                                  threshold_cls, conf_thres, nms_thres, filter_labels, self.mulScale)
-        else:
-            self.loss_func = yoloLoss.YOLOv3Loss(self.device, num_anchors, num_classes, threshold_conf,
-                                                 threshold_cls, conf_thres, nms_thres, filter_labels, self.mulScale)
+
         # self.network.apply(yoloNet.weights_init)
         self.network.fpn.apply(yoloNet.weights_init) # backbone 不使用
         self.network.net.apply(yoloNet.weights_init2)
@@ -204,6 +198,7 @@ class YOLO(nn.Module):
     def forward(self):
         if self.isTrain:
             for epoch in range(self.epochs):
+                """
                 loss_record = self.train(epoch)
                 # if epoch>0 and epoch%30==0:
                 #     self.test(3)
@@ -217,12 +212,27 @@ class YOLO(nn.Module):
                     if key not in self.history.history:
                         self.history.history[key] = []
                     self.history.history[key].append(value)
+                """
+                self.train2(epoch)
+                # update the learning rate
+                self.lr_scheduler.step()
+                torch.save(self.network.state_dict(), self.save_model)
+                # """
 
         else:
             self.test()
 
     def fit(self):
         pass
+
+    def train2(self,epoch):
+            # train for one epoch, printing every 10 iterations
+            train_one_epoch(self.network, self.optimizer, self.train_loader, self.device, epoch, self.print_freq)
+
+    def eval(self):
+        # evaluate on the test dataset
+        evaluate(self.network, self.test_loader, self.device)
+
 
     def train(self,epoch):
         self.network.train()

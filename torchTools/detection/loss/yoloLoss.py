@@ -67,7 +67,7 @@ class YOLOv1Loss(nn.Module):
             "loss_box": 0,
             "loss_clf": 0,
             "loss_no_clf": 0,
-            # "iou_loss": iou_loss
+            "loss_iou": 0
         }
 
         for jj in range(len(targets_origin)):
@@ -88,6 +88,7 @@ class YOLOv1Loss(nn.Module):
                     loss_box = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
                     loss_clf = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
                     loss_no_clf = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                    loss_iou = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
                 else:
                     if useFocal:
                         # preds = F.sigmoid(preds)  # 不执行
@@ -109,6 +110,11 @@ class YOLOv1Loss(nn.Module):
                                                           alpha,gamma,reduction="sum")
                         loss_no_clf = F.mse_loss(torch.sigmoid(no_obj[..., 5:]), torch.zeros_like(no_obj[..., 5:]).detach(),
                                                  reduction="sum")
+
+                        # iou loss
+                        loss_iou = giou_loss_jit(xywh2x1y1x2y2(torch.sigmoid(has_obj[..., :4])),
+                                                 xywh2x1y1x2y2(targ_obj[..., :4]).detach(), reduction="sum")
+
                     else:
                         preds = F.sigmoid(preds) # ??????????????????????
                         preds = preds.contiguous().view(-1,5 + self.num_classes)
@@ -138,6 +144,10 @@ class YOLOv1Loss(nn.Module):
                         loss_no_clf = F.mse_loss(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
                         # loss_no_clf = F.binary_cross_entropy(no_obj[..., 5:], torch.zeros_like(no_obj[..., 5:]).detach(), reduction="sum")
 
+                        # iou loss
+                        loss_iou = giou_loss_jit(xywh2x1y1x2y2(has_obj[..., :4]),xywh2x1y1x2y2(targ_obj[..., :4]).detach(),reduction="sum")
+
+
 
 
                 losses["loss_conf"] += loss_conf
@@ -145,6 +155,7 @@ class YOLOv1Loss(nn.Module):
                 losses["loss_box"] += loss_box * 50.  # 50
                 losses["loss_clf"] += loss_clf
                 losses["loss_no_clf"] += loss_no_clf * 0.05
+                losses["loss_iou"] += loss_iou * 50.
 
         return losses
 
@@ -410,9 +421,6 @@ class YOLOv2Loss(YOLOv1Loss):
                  nms_thres=0.4,
                  filter_labels: list = [],
                  mulScale=False,):
-        super(YOLOv2Loss,self).__init__(device, num_anchors,
-                                        num_classes,threshold_conf,threshold_cls,
-                                        conf_thres,nms_thres,filter_labels,mulScale)
 
         # 缩放到输入图像大小上 格式（w,h）
         # self.PreBoxSize = torch.as_tensor([(1.3221, 1.73145), (3.19275, 4.00944), (5.05587, 8.09892), (9.47112, 4.84053),
@@ -420,11 +428,17 @@ class YOLOv2Loss(YOLOv1Loss):
 
         # self.PreBoxSize = torch.as_tensor([(1.0, 1.0), (0.5, 0.5), (0.25, 0.25),(0.5,0.25),(0.25,0.5)], dtype=torch.float32,
         #                                   device=self.device)
-        self.PreBoxSize = torch.as_tensor([(0.45, 0.45), (0.15, 0.15), (0.05, 0.05),(0.2,0.1),(0.1,0.2)], dtype=torch.float32,
+        self.PreBoxSize = torch.as_tensor([(0.4, 0.4),(0.2, 0.2),(0.1, 0.1),(0.05,0.05),(0.025,0.025)], dtype=torch.float32,
                                           device=self.device)
 
         # self.mse_loss = nn.MSELoss(reduction='sum')
         # self.bce_loss = nn.BCELoss(reduction='sum')
+
+        num_anchors = self.PreBoxSize.size(0)
+
+        super(YOLOv2Loss, self).__init__(device, num_anchors,
+                                         num_classes, threshold_conf, threshold_cls,
+                                         conf_thres, nms_thres, filter_labels, mulScale)
 
     def forward(self,preds,targets):
         if "boxes" not in targets[0]:
@@ -594,24 +608,6 @@ class YOLOv2Loss(YOLOv1Loss):
             boxes[:, j, 3] = y2
 
         return boxes
-
-
-class YOLOv3Loss(YOLOv2Loss):
-    def __init__(self, device="cpu", num_anchors=3,
-                 num_classes=20,  # 不包括背景
-                 threshold_conf=0.05,
-                 threshold_cls=0.5,
-                 conf_thres=0.8,
-                 nms_thres=0.4,
-                 filter_labels: list = [],
-                 mulScale=False,):
-        super(YOLOv3Loss,self).__init__(device, num_anchors,
-                                        num_classes,threshold_conf,threshold_cls,
-                                        conf_thres,nms_thres,filter_labels,mulScale)
-        # resize到输入图像尺度上
-        # self.PreBoxSize = np.asarray([(116, 90), (156, 198), (373 , 326)])/416.
-        # self.PreBoxSize = torch.as_tensor([(1.0,1.0),(0.5,0.5),(0.25,0.25)],dtype=torch.float32,device=self.device)
-        self.PreBoxSize = torch.as_tensor([(0.4,0.4),(0.1,0.1),(0.05,0.05)],dtype=torch.float32,device=self.device)
 
 
 def box_area(boxes):

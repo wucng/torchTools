@@ -117,7 +117,7 @@ class YOLOv1Loss(nn.Module):
                                                  xywh2x1y1x2y2(targ_obj[..., :4]).detach(), reduction="sum")
 
                     else:
-                        preds = F.sigmoid(preds) # ??????????????????????
+                        preds = torch.sigmoid(preds) # ??????????????????????
                         preds = preds.contiguous().view(-1,5 + self.num_classes)
                         targets = targets.contiguous().view(-1, 5 + self.num_classes)
 
@@ -224,7 +224,7 @@ class YOLOv1Loss(nn.Module):
         for idx, preds in enumerate(preds_list):
             bs, fh, fw = preds.shape[:-1]
             preds = preds.contiguous().view(bs,-1, self.num_anchors, 5 + self.num_classes)
-            preds = F.sigmoid(preds)
+            preds = torch.sigmoid(preds)
             for i in range(bs):
                 targets = targets_origin[i]
                 new_preds = preds[i]

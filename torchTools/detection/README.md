@@ -17,9 +17,9 @@ typeOfData = "PennFudanDataset"
 
 model = yolo.YOLO(traindataPath, testdataPath,preddataPath,"resnet34", pretrained=True, num_features=1,resize=resize,
                    isTrain=True, num_anchors=2, mulScale=mulScale, epochs=50, print_freq=50,dropRate=0.0,
-                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=5e-4, batch_size=2,freeze_at=0,
-                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,version="v1",
-                 useFocal=True,train_method=1)
+                   basePath=basePath, threshold_conf=0.3, threshold_cls=0.3, lr=5e-4, batch_size=2,freeze_at=0,
+                   conf_thres=0.3, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,version="v2",
+                 useFocal=True,train_method=0,method=0)
 
 model = ssd.SSD(traindataPath, testdataPath,preddataPath, "resnet34", pretrained=True, num_features=1,resize=resize,
                    isTrain=True, num_anchors=3, mulScale=mulScale, epochs=50, print_freq=40,dropRate=0.0,

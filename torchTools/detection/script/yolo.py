@@ -1,12 +1,12 @@
 try:
-    from .tools.engine import train_one_epoch2, evaluate
+    from .tools.engine import train_one_epoch2, evaluate2
     from ..network import yoloNet
     from ..loss import yoloLoss
     from ..datasets import datasets, bboxAug
     from ..visual import opencv
     from ..optm import optimizer
 except:
-    from tools.engine import train_one_epoch2, evaluate
+    from tools.engine import train_one_epoch2, evaluate2
     import sys
     sys.path.append("..")
     from network import yoloNet
@@ -61,11 +61,11 @@ class History():
         plt.show()
 
 class YOLO(nn.Module):
-    def __init__(self,trainDP=None,testDP=None,model_name="resnet18",num_features=None,
+    def __init__(self,trainDP=None,testDP=None,predDP=None,model_name="resnet18",num_features=None,
                  pretrained=False,dropRate=0.0, usize=256,isTrain=False,freeze_at=1,
                  basePath="./",save_model = "model.pt",summaryPath="yolov1_resnet50_416",
-                 epochs = 100,print_freq=1,resize:tuple = (224,224),useFocal=False,method=1,
-                 mulScale=False,advanced=False,batch_size=2,num_anchors=2,lr=5e-4,
+                 epochs = 100,print_freq=1,resize:tuple = (224,224),useFocal=True,method=1,
+                 mulScale=False,advanced=False,batch_size=2,num_anchors=2,lr=5e-4,train_method=1,
                  # num_classes=20,
                  typeOfData="PennFudanDataset",
                  threshold_conf=0.5,threshold_cls=0.5, #  # 0.05,0.5
@@ -80,6 +80,7 @@ class YOLO(nn.Module):
         self.mulScale = mulScale
         self.classes = classes
         num_classes = len(self.classes)
+        self.train_method = train_method
 
         # seed = 100
         seed = int(time.time() * 1000)
@@ -120,29 +121,40 @@ class YOLO(nn.Module):
                           bboxAug.Normalize() # tensor --> tensor
                       ]),classes=classes)
 
-            test_dataset = datasets.ValidDataset(testDP,
-                                            transforms=bboxAug.Compose([
-                                                bboxAug.Pad(), bboxAug.Resize(resize, False),
-                                                bboxAug.ToTensor(),  # PIL --> tensor
-                                                bboxAug.Normalize()  # tensor --> tensor
-                                            ]))
-
             self.train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
-                                          collate_fn=collate_fn, **kwargs)
-
-            self.test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
-                                          collate_fn=collate_fn, **kwargs)
+                                           collate_fn=collate_fn, **kwargs)
 
 
+            if testDP is not None:
+                test_dataset = Data(testDP,
+                                    transforms=bboxAug.Compose([
+                                        bboxAug.Pad(), bboxAug.Resize(resize, False),
+                                        bboxAug.ToTensor(),  # PIL --> tensor
+                                        bboxAug.Normalize()  # tensor --> tensor
+                                    ]),classes=classes)
+
+                self.test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
+                                              collate_fn=collate_fn, **kwargs)
+
+            if predDP is not None:
+                pred_dataset = datasets.ValidDataset(predDP,
+                                                     transforms=bboxAug.Compose([
+                                                         bboxAug.Pad(), bboxAug.Resize(resize, False),
+                                                         bboxAug.ToTensor(),  # PIL --> tensor
+                                                         bboxAug.Normalize()  # tensor --> tensor
+                                                     ]))
+
+                self.pred_loader = DataLoader(pred_dataset, batch_size=batch_size, shuffle=False,
+                                              collate_fn=collate_fn, **kwargs)
         else:
-            test_dataset = datasets.ValidDataset(testDP,
+            pred_dataset = datasets.ValidDataset(predDP,
                       transforms=bboxAug.Compose([
                           bboxAug.Pad(), bboxAug.Resize(resize, False),
                           bboxAug.ToTensor(),  # PIL --> tensor
                           bboxAug.Normalize() # tensor --> tensor
                       ]))
 
-            self.test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False,
+            self.pred_loader = DataLoader(pred_dataset, batch_size=batch_size, shuffle=False,
                                           collate_fn=collate_fn, **kwargs)
 
 
@@ -200,26 +212,25 @@ class YOLO(nn.Module):
     def forward(self):
         if self.isTrain:
             for epoch in range(self.epochs):
-                """
-                loss_record = self.train(epoch)
-                # if epoch>0 and epoch%30==0:
-                #     self.test(3)
-                # update the learning rate
-                self.lr_scheduler.step()
-                torch.save(self.network.state_dict(), self.save_model)
-                # torch.save(self.network.state_dict(), self.save_model+"_"+str(epoch))
+                if self.train_method:
+                    loss_record = self.train(epoch)
+                    # if epoch>0 and epoch%30==0:
+                    #     self.test(3)
+                    # update the learning rate
+                    # self.lr_scheduler.step()
+                    # torch.save(self.network.state_dict(), self.save_model)
+                    # torch.save(self.network.state_dict(), self.save_model+"_"+str(epoch))
 
-                self.history.epoch.append(epoch)
-                for key, value in loss_record.items():
-                    if key not in self.history.history:
-                        self.history.history[key] = []
-                    self.history.history[key].append(value)
-                """
-                self.train2(epoch)
+                    self.history.epoch.append(epoch)
+                    for key, value in loss_record.items():
+                        if key not in self.history.history:
+                            self.history.history[key] = []
+                        self.history.history[key].append(value)
+                else:
+                    self.train2(epoch)
                 # update the learning rate
                 self.lr_scheduler.step()
                 torch.save(self.network.state_dict(), self.save_model)
-                # """
 
         else:
             self.test()
@@ -235,7 +246,7 @@ class YOLO(nn.Module):
 
     def eval(self):
         # evaluate on the test dataset
-        evaluate(self.network, self.test_loader, self.device)
+        evaluate2(self.network,self.loss_func, self.test_loader, self.device)
 
 
     def train(self,epoch):
@@ -298,7 +309,7 @@ class YOLO(nn.Module):
     def test(self,nums=None):
         self.network.eval()
         with torch.no_grad():
-            for idx, (data, target) in enumerate(self.test_loader):
+            for idx, (data, target) in enumerate(self.pred_loader):
                 if nums is not None:
                     if idx > nums:break
                 data = torch.stack(data,0) # 做测试时不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
@@ -335,7 +346,7 @@ class YOLO(nn.Module):
     def predict(self,nums=None):
         self.network.eval()
         with torch.no_grad():
-            for idx, (data, target) in enumerate(self.test_loader):
+            for idx, (data, target) in enumerate(self.pred_loader):
                 if nums is not None:
                     if idx > nums:break
                 data = torch.stack(data,0) # 做测试时不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度

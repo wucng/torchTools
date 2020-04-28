@@ -29,7 +29,7 @@ class YOLOv1Loss(nn.Module):
                  conf_thres=0.8,
                  nms_thres=0.4,
                  filter_labels:list = [],
-                 mulScale=False,useFocal=False):
+                 mulScale=False,useFocal=True):
         super(YOLOv1Loss, self).__init__()
         self.device = device
         self.num_anchors = num_anchors
@@ -421,7 +421,7 @@ class YOLOv2Loss(YOLOv1Loss):
                  conf_thres=0.8,
                  nms_thres=0.4,
                  filter_labels: list = [],
-                 mulScale=False,useFocal=False,method=1):
+                 mulScale=False,useFocal=True,method=1):
 
         super(YOLOv2Loss, self).__init__(device, num_anchors,
                                          num_classes, threshold_conf, threshold_cls,

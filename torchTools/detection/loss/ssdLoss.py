@@ -29,7 +29,7 @@ class SSDLoss(nn.Module):
                  conf_thres=0.8,
                  nms_thres=0.4,
                  filter_labels:list = [],
-                 mulScale=False):
+                 mulScale=False,useFocal=True,clip=False):
         super(SSDLoss, self).__init__()
         self.device = device
         self.num_anchors = num_anchors
@@ -41,6 +41,8 @@ class SSDLoss(nn.Module):
         self.nms_thres = nms_thres
         self.filter_labels = filter_labels
         self.neg_pos_ratio = 3
+        self.useFocal = useFocal
+        self.clip = clip
 
     def forward(self,preds,targets):
         if "boxes" not in targets[0]:
@@ -49,7 +51,7 @@ class SSDLoss(nn.Module):
             results = [self.apply_nms(result) for result in results]
             return results
         else:
-            return self.compute_loss(preds, targets,useFocal=True)
+            return self.compute_loss(preds, targets,useFocal=self.useFocal)
 
     def compute_loss(self,preds_list, targets_origin,useFocal=False,alpha=0.2,gamma=2):
         """
@@ -83,6 +85,7 @@ class SSDLoss(nn.Module):
                 if gt_locations is None:
                     smooth_l1_loss = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
                     classification_loss = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                    loss_iou = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
                 else:
                     preds = preds.contiguous().view(-1,5 + self.num_classes)
                     preds[..., :2] = torch.sigmoid(preds[..., :2])
@@ -119,7 +122,7 @@ class SSDLoss(nn.Module):
 
         return losses
 
-    def get_prior_box(self, featureShape, target,clip=True):
+    def get_prior_box(self, featureShape, target):
         priors = []
         fh,fw=featureShape
         h, w = target["resize"]
@@ -151,7 +154,7 @@ class SSDLoss(nn.Module):
                     priors.append([cx, cy, 1.0*bw / ratio, bh * ratio])
 
         priors = torch.tensor(priors,device=self.device)
-        if clip:
+        if self.clip:
             priors.clamp_(max=1, min=0)
         return priors
 

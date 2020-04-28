@@ -1,4 +1,45 @@
 ```py
+!pip install -U https://github.com/wucng/torchTools/archive/master.zip
+#or !pip install 'git+https://github.com/wucng/torchTools.git'
+!pip install 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'
+!pip install git+https://github.com/facebookresearch/fvcore.git
+
+from torchTools.detection.script import cascadessd,ssd,yolo,fasterrcnn
+
+classes=["person"]
+preddataPath = "/kaggle/input/pennfudanped/PNGImages/"
+testdataPath = "/kaggle/input/pennfudanped/"
+traindataPath = "/kaggle/input/pennfudanped/"
+basePath = "/kaggle/working/models"
+resize = (480,480)
+mulScale = False
+typeOfData = "PennFudanDataset"
+
+model = yolo.YOLO(traindataPath, testdataPath,preddataPath,"resnet34", pretrained=True, num_features=1,resize=resize,
+                   isTrain=True, num_anchors=2, mulScale=mulScale, epochs=50, print_freq=50,dropRate=0.0,
+                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=5e-4, batch_size=2,freeze_at=0,
+                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,version="v1",
+                 useFocal=True,train_method=1)
+
+model = ssd.SSD(traindataPath, testdataPath,preddataPath, "resnet34", pretrained=True, num_features=1,resize=resize,
+                   isTrain=True, num_anchors=3, mulScale=mulScale, epochs=50, print_freq=40,dropRate=0.0,
+                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=3e-4, batch_size=2,
+                   conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,freeze_at=0,
+				   useFocal=True,clip=False,train_method=1)
+
+model = fasterrcnn.Fasterrcnn(traindataPath, classes, "resnet50", pretrained=True, num_epochs=10,
+                       conf_thres=0.4, nms_thres=0.4, batch_size=2,usize=256,lr=5e-3,
+                       use_FPN=True, basePath=basePath, useMask=True, selfmodel=False)
+
+model()
+
+model.eval()
+model.predict(5)
+model.predict(testdataPath,10)
+```
+----
+
+```py
 #!pip install https://github.com/wucng/torchTools/archive/master.zip
 from torchTools.detection.run import yolo
 from torchTools.detection.datasets import datasets, bboxAug

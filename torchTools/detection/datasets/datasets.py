@@ -110,6 +110,7 @@ class PascalVOCDataset(Dataset):
         target = {}
         target["boxes"] = boxes
         target["labels"] = labels
+        target["image_id"] = torch.tensor([idx])
 
         if self.transforms is not None:
             img, target = self.transforms(img, target)
@@ -197,6 +198,7 @@ class FDDBDataset(Dataset):
         target = {}
         target["boxes"] = boxes
         target["labels"] = labels
+        target["image_id"] = torch.tensor([idx])
 
         if self.transforms is not None:
             img, target = self.transforms(img, target)
@@ -294,6 +296,7 @@ class WIDERFACEDataset(Dataset):
         target = {}
         target["boxes"] = boxes
         target["labels"] = labels
+        target["image_id"] = torch.tensor([idx])
 
         if self.transforms is not None:
             img, target = self.transforms(img, target)
@@ -367,7 +370,7 @@ class PennFudanDataset(Dataset):
         target["boxes"] = boxes
         target["labels"] = labels
         # target["masks"] = masks
-        # target["image_id"] = image_id
+        target["image_id"] = image_id
         # target["area"] = area
         # target["iscrowd"] = iscrowd
 

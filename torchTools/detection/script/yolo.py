@@ -404,7 +404,8 @@ if __name__=="__main__":
     # traindataPath = "/home/wucong/practise/datas/PennFudanPed/"
     # testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
     # traindataPath = "D:/practice/datas/PennFudanPed/"
-    testdataPath = r"C:\practice\datas\PennFudanPed\PNGImages"
+    preddataPath = r"C:\practice\datas\PennFudanPed\PNGImages"
+    testdataPath = r"C:\practice\datas\PennFudanPed"
     traindataPath = r"C:\practice\datas\PennFudanPed"
     typeOfData = "PennFudanDataset"
     """
@@ -415,7 +416,7 @@ if __name__=="__main__":
     # """
 
     basePath = "./models/"
-    model = YOLO(traindataPath, testdataPath, "resnet18", pretrained=False, num_features=1,resize=(96,96),
+    model = YOLO(traindataPath, testdataPath, preddataPath,"resnet18", pretrained=False, num_features=1,resize=(96,96),
                    isTrain=True, num_anchors=2, mulScale=False, epochs=400, print_freq=40,dropRate=0.0,
                    basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,freeze_at=0,
                    conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,version="v2")

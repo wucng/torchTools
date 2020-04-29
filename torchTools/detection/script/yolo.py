@@ -324,7 +324,7 @@ class YOLO(nn.Module):
     def test(self,nums=None):
         self.network.eval()
         with torch.no_grad():
-            for idx, (data, target) in enumerate(self.pred_loader):
+            for idx, (data, target) in enumerate(self.test_dataset):
                 if nums is not None:
                     if idx > nums:break
                 data = torch.stack(data,0) # 做测试时不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
@@ -343,14 +343,14 @@ class YOLO(nn.Module):
                     if pred is None:continue
                     path = target[i]["path"]
                     image = np.asarray(PIL.Image.open(path).convert("RGB"), np.uint8)
-                    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+                    # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
                     image = self.draw_rect(image,pred)
 
-                    cv2.imshow("test", image)
-                    cv2.waitKey(0)
-                    cv2.destroyAllWindows()
-                    # plt.imshow(image)
-                    # plt.show()
+                    # cv2.imshow("test", image)
+                    # cv2.waitKey(0)
+                    # cv2.destroyAllWindows()
+                    plt.imshow(image)
+                    plt.show()
                     # PIL.Image.fromarray(image).show()
 
                     # save

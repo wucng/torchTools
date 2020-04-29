@@ -173,7 +173,8 @@ class SSD(nn.Module):
 
         self.loss_func = ssdLoss.SSDLoss(self.device,num_anchors,num_classes,threshold_conf,
                                          threshold_cls,conf_thres,nms_thres,filter_labels,self.mulScale,useFocal,clip)
-        self.network = ssdNet.SSDNet(num_classes,num_anchors,model_name,num_features,pretrained,dropRate,usize,freeze_at)
+        # self.network = ssdNet.SSDNet(num_classes,num_anchors,model_name,num_features,pretrained,dropRate,usize,freeze_at)
+        self.network = ssdNet.SSDNet2(num_classes,num_anchors,model_name,num_features,pretrained,dropRate,usize,freeze_at)
 
         # self.network.apply(ssdNet.weights_init)
         self.network.fpn.apply(ssdNet.weights_init) # backbone 不使用
@@ -411,7 +412,7 @@ if __name__=="__main__":
     # testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
     # traindataPath = "D:/practice/datas/PennFudanPed/"
     preddataPath = r"C:\practice\datas\PennFudanPed\PNGImages"
-    testdataPath = r"C:\practice\datas\PennFudanPed"
+    testdataPath = None
     traindataPath = r"C:\practice\datas\PennFudanPed"
     typeOfData = "PennFudanDataset"
     """
@@ -424,7 +425,7 @@ if __name__=="__main__":
     basePath = "./models/"
     model = SSD(traindataPath, testdataPath, preddataPath,"resnet18", pretrained=False, num_features=1,resize=(96,96),
                    isTrain=True, num_anchors=3, mulScale=False, epochs=400, print_freq=40,dropRate=0.0,
-                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,
+                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,clip=True,train_method=1,
                    conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,freeze_at=0)
 
     model()

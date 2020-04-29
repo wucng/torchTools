@@ -418,7 +418,7 @@ if __name__=="__main__":
     # testdataPath = "D:/practice/datas/PennFudanPed/PNGImages/"
     # traindataPath = "D:/practice/datas/PennFudanPed/"
     preddataPath = r"C:\practice\datas\PennFudanPed\PNGImages"
-    testdataPath = r"C:\practice\datas\PennFudanPed"
+    testdataPath = None
     traindataPath = r"C:\practice\datas\PennFudanPed"
     typeOfData = "PennFudanDataset"
     """

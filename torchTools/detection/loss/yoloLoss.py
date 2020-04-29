@@ -455,6 +455,82 @@ class YOLOv2Loss(YOLOv1Loss):
         else:
             return self.compute_loss(preds, targets,useFocal=self.useFocal)
 
+    def compute_loss(self,preds_list, targets_origin,useFocal=True,alpha=0.2,gamma=2):
+        """
+        :param preds:
+                if mulScale: # 使用多尺度（2个特征为例,batch=2）
+                    preds=[[(1,28,28,12),(1,14,14,12)],[(1,28,28,12),(1,14,14,12)]]
+                else: #（2个特征为例,batch=2）
+                   preds=[(2,28,28,12),(2,14,14,12)]
+        :param targets:
+                [{"boxes":(n,4),"labels":(n,)},{"boxes":(m,4),"labels":(m,)}]
+        :return:
+        """
+        losses = {
+            "loss_conf": 0,
+            "loss_no_conf": 0,
+            "loss_box": 0,
+            "loss_clf": 0,
+            "loss_no_clf": 0#,
+            # "loss_iou": 0
+        }
+
+        for jj in range(len(targets_origin)):
+            target_origin = targets_origin[jj]
+            if self.mulScale:
+                pred_list = preds_list[jj]
+            else:
+                pred_list =[pred[jj].unsqueeze(0) for pred in preds_list]
+
+            for i, preds in enumerate(pred_list):
+                fh, fw = preds.shape[1:-1]
+
+                # normalize
+                targets = self.normalize((fh, fw), target_origin)
+                if targets is None:
+                    loss_conf = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                    loss_no_conf = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                    loss_box = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                    loss_clf = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                    loss_no_clf = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                    # loss_iou = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                else:
+                    # if useFocal:
+                    # preds = F.sigmoid(preds)  # 不执行
+                    preds = preds.contiguous().view(-1, 5 + self.num_classes)
+                    targets = targets.contiguous().view(-1, 5 + self.num_classes)
+
+                    index = targets[..., 4] == 1
+                    no_index = targets[..., 4] != 1
+                    has_obj = preds[index]
+                    no_obj = preds[no_index]
+                    targ_obj = targets[index]
+
+                    loss_conf = sigmoid_focal_loss_jit(has_obj[..., 4],torch.ones_like(has_obj[..., 4]).detach(),
+                                                       alpha,gamma,reduction="sum")
+                    loss_no_conf = sigmoid_focal_loss_jit(no_obj[..., 4],torch.zeros_like(no_obj[..., 4]).detach(),
+                                                          alpha,gamma,reduction="sum")
+                    has_obj[..., :2] = torch.sigmoid(has_obj[..., :2]) # w,h 不使用sigmoid ，因为会出现负值
+                    loss_box = smooth_l1_loss_jit(has_obj[..., :4], targ_obj[..., :4].detach(),2e-5,reduction="sum")
+                    loss_clf = sigmoid_focal_loss_jit(has_obj[..., 5:], targ_obj[..., 5:].detach(),
+                                                      alpha,gamma,reduction="sum")
+                    loss_no_clf = F.mse_loss(torch.sigmoid(no_obj[..., 5:]), torch.zeros_like(no_obj[..., 5:]).detach(),
+                                             reduction="sum")
+
+                    # iou loss w,h 会出现负值，不好计算IOU loss
+                    # loss_iou = giou_loss_jit(xywh2x1y1x2y2(torch.sigmoid(has_obj[..., :4])),
+                    #                          xywh2x1y1x2y2(targ_obj[..., :4]).detach(), reduction="sum")
+
+
+                losses["loss_conf"] += loss_conf
+                losses["loss_no_conf"] += loss_no_conf * 0.05  # 0.05
+                losses["loss_box"] += loss_box * 50.  # 50
+                losses["loss_clf"] += loss_clf
+                losses["loss_no_clf"] += loss_no_clf * 0.05
+                # losses["loss_iou"] += loss_iou
+
+        return losses
+
     def normalize2(self, featureShape, target):
         """不做筛选所有的anchor都参与计算"""
         grid_ceil_h, grid_ceil_w = featureShape
@@ -573,6 +649,91 @@ class YOLOv2Loss(YOLOv1Loss):
                 result[idx, y, x, j, 3] = torch.log(h_b[i] / ph)
                 result[idx, y, x, j, 4] = 1  # 置信度
                 result[idx, y, x, j, 5 + int(label[i])] = 1  # 转成one-hot
+
+        return result
+
+    def predict(self, preds_list,targets_origin):
+        """
+        :param preds_list:
+                   #（2个特征为例,batch=2）
+                   preds_list=[(2,28,28,12),(2,14,14,12)]
+        :param targets_origin:
+                  [{"resize":(h,w),"origin_size":(h,w)},{"resize":(h,w),"origin_size":(h,w)}]
+        :return:
+        """
+        result = []
+
+        for idx, preds in enumerate(preds_list):
+            bs, fh, fw = preds.shape[:-1]
+            preds = preds.contiguous().view(bs,-1, self.num_anchors, 5 + self.num_classes)
+            # preds = torch.sigmoid(preds)
+            preds[...,:2] = torch.sigmoid(preds[...,:2])
+            preds[...,4:] = torch.sigmoid(preds[...,4:])
+            # w,h 会出现负值 不使用sigmoid
+
+            for i in range(bs):
+                targets = targets_origin[i]
+                new_preds = preds[i]
+                new_preds[...,:4] = self.reverse_normalize((fh, fw), new_preds[...,:4], targets)
+                new_preds = new_preds[:, (new_preds[:, :, 4] * new_preds[:, :, 5:].max(-1)[0]).max(1)[1], :][:, 0, :]
+                # new_preds = new_preds[:, new_preds[:, :, 4].max(1)[1], :][:, 0, :]
+                # new_preds = new_preds[:, new_preds[:, :, 5:].max(-1)[0].max(1)[1], :][:, 0, :]
+
+                pred_box = new_preds[:,:4]
+                pred_conf = new_preds[:, 4]
+                pred_cls = new_preds[:, 5:]
+
+                # pred_box = clip_boxes_to_image(pred_box, input_img[0].size()[-2:])  # 裁剪到图像内
+                # # 过滤尺寸很小的框
+                # keep = remove_small_boxes(pred_box.round(), self.min_size)
+                # pred_box = pred_box[keep]
+                # pred_cls = pred_cls[keep]
+                # confidence = pred_conf[keep]#.squeeze(1)
+
+
+                confidence = pred_conf
+
+                # condition = (pred_cls * confidence).max(dim=0)[0] > self.threshold_conf
+                # condition = (pred_cls * confidence) > self.threshold_conf
+                condition = confidence > self.threshold_conf
+
+                keep = torch.nonzero(condition).squeeze(1)
+
+                if len(keep)==0:
+                    pred_box = torch.zeros([1,4],dtype=pred_box.dtype,device=pred_box.device)
+                    scores = torch.zeros([1,1],dtype=pred_box.dtype,device=pred_box.device)
+                    labels = torch.zeros([1,1],dtype=pred_box.dtype,device=pred_box.device)
+                    confidence = torch.zeros([1,1],dtype=pred_box.dtype,device=pred_box.device)
+
+                else:
+                    pred_box = pred_box[keep]
+                    pred_cls = pred_cls[keep]
+                    confidence = confidence[keep]
+
+                    # labels and scores
+                    # scores, labels = torch.softmax(pred_cls, -1).max(dim=1)
+                    scores, labels = pred_cls.max(dim=1)
+
+                    # 过滤分类分数低的
+                    # keep = torch.nonzero(scores > self.threshold_cls).squeeze(1)
+                    keep = torch.nonzero(scores > self.threshold_cls).squeeze(1)
+                    if len(keep)==0:
+                        pred_box = torch.zeros([1, 4], dtype=pred_box.dtype, device=pred_box.device)
+                        scores = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
+                        labels = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
+                        confidence = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
+                    else:
+                        pred_box, scores, labels, confidence = pred_box[keep], scores[keep], labels[keep], confidence[keep]
+
+                if len(result) < bs:
+                    result.append({"boxes": pred_box, "scores": scores, "labels": labels, "confidence": confidence})
+                    result[i].update(targets)
+                else:
+                    assert len(result) == bs, print("error")
+                    result[i]["boxes"] = torch.cat((result[i]["boxes"], pred_box), 0)
+                    result[i]["scores"] = torch.cat((result[i]["scores"], scores), 0)
+                    result[i]["labels"] = torch.cat((result[i]["labels"], labels), 0)
+                    result[i]["confidence"] = torch.cat((result[i]["confidence"], confidence), 0)
 
         return result
 

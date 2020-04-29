@@ -256,7 +256,7 @@ class YOLOv1Loss(nn.Module):
                 if len(keep)==0:
                     pred_box = torch.zeros([1,4],dtype=pred_box.dtype,device=pred_box.device)
                     scores = torch.zeros([1,],dtype=pred_box.dtype,device=pred_box.device)
-                    labels = torch.zeros([1,],dtype=pred_box.dtype,device=pred_box.device)
+                    labels = torch.zeros([1,],dtype=torch.long,device=pred_box.device)
                     confidence = torch.zeros([1,],dtype=pred_box.dtype,device=pred_box.device)
 
                 else:
@@ -274,7 +274,7 @@ class YOLOv1Loss(nn.Module):
                     if len(keep)==0:
                         pred_box = torch.zeros([1, 4], dtype=pred_box.dtype, device=pred_box.device)
                         scores = torch.zeros([1, ], dtype=pred_box.dtype, device=pred_box.device)
-                        labels = torch.zeros([1, ], dtype=pred_box.dtype, device=pred_box.device)
+                        labels = torch.zeros([1, ], dtype=torch.long, device=pred_box.device)
                         confidence = torch.zeros([1, ], dtype=pred_box.dtype, device=pred_box.device)
                     else:
                         pred_box, scores, labels, confidence = pred_box[keep], scores[keep], labels[keep], confidence[keep]
@@ -703,7 +703,7 @@ class YOLOv2Loss(YOLOv1Loss):
                 if len(keep)==0:
                     pred_box = torch.zeros([1,4],dtype=pred_box.dtype,device=pred_box.device)
                     scores = torch.zeros([1,],dtype=pred_box.dtype,device=pred_box.device)
-                    labels = torch.zeros([1,],dtype=pred_box.dtype,device=pred_box.device)
+                    labels = torch.zeros([1,],dtype=torch.long,device=pred_box.device)
                     confidence = torch.zeros([1,],dtype=pred_box.dtype,device=pred_box.device)
 
                 else:
@@ -721,7 +721,7 @@ class YOLOv2Loss(YOLOv1Loss):
                     if len(keep)==0:
                         pred_box = torch.zeros([1, 4], dtype=pred_box.dtype, device=pred_box.device)
                         scores = torch.zeros([1,], dtype=pred_box.dtype, device=pred_box.device)
-                        labels = torch.zeros([1,], dtype=pred_box.dtype, device=pred_box.device)
+                        labels = torch.zeros([1,], dtype=torch.long, device=pred_box.device)
                         confidence = torch.zeros([1,], dtype=pred_box.dtype, device=pred_box.device)
                     else:
                         pred_box, scores, labels, confidence = pred_box[keep], scores[keep], labels[keep], confidence[keep]

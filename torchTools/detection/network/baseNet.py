@@ -323,11 +323,14 @@ class FPNNetSmall(nn.Module):
                 nn.LeakyReLU(0.2)
             )
 
-            upsample = nn.Sequential(
-                nn.ConvTranspose2d(usize,usize,3,2,1,1),
-                nn.BatchNorm2d(usize),
-                nn.LeakyReLU(0.2),
-            )
+            if i > 0:
+                upsample = nn.Sequential(
+                    nn.ConvTranspose2d(usize,usize,3,2,1,1),
+                    nn.BatchNorm2d(usize),
+                    nn.LeakyReLU(0.2),
+                )
+            else:
+                upsample = None
 
             tmp = nn.ModuleList()
             tmp.append(m)

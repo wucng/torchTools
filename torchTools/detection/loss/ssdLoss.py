@@ -216,8 +216,8 @@ class SSDLoss(nn.Module):
 
                 if len(keep)==0:
                     pred_box = torch.zeros([1, 4], dtype=pred_box.dtype, device=pred_box.device)
-                    scores = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
-                    labels = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)
+                    scores = torch.zeros([1,], dtype=pred_box.dtype, device=pred_box.device)
+                    labels = torch.zeros([1,], dtype=pred_box.dtype, device=pred_box.device)
                 else:
                     pred_box, scores, labels = pred_box[keep], scores[keep], labels[keep]
 

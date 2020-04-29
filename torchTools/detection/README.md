@@ -1,4 +1,7 @@
 ```py
+!wget https://www.cis.upenn.edu/~jshi/ped_html/PennFudanPed.zip
+!unzip PennFudanPed.zip > /dev/null
+
 !pip install -U https://github.com/wucng/torchTools/archive/master.zip
 #or !pip install 'git+https://github.com/wucng/torchTools.git'
 !pip install 'git+https://github.com/cocodataset/cocoapi.git#subdirectory=PythonAPI'

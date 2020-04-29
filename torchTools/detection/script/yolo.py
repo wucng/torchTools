@@ -137,10 +137,11 @@ class YOLO(nn.Module):
                                         bboxAug.ToTensor(),  # PIL --> tensor
                                         bboxAug.Normalize()  # tensor --> tensor
                                     ]), classes=classes)
-
-                indices = torch.randperm(len(train_dataset)).tolist()
-                train_dataset = torch.utils.data.Subset(train_dataset, indices[:-50])
-                test_dataset = torch.utils.data.Subset(test_dataset, indices[-50:])
+                num_datas = len(train_dataset)
+                num_train = int(0.8*num_datas)
+                indices = torch.randperm(num_datas).tolist()
+                train_dataset = torch.utils.data.Subset(train_dataset, indices[:num_train])
+                test_dataset = torch.utils.data.Subset(test_dataset, indices[num_train:])
 
             self.train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,
                                            collate_fn=collate_fn, **kwargs)

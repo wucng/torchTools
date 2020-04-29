@@ -450,7 +450,7 @@ class YOLOv2Loss(YOLOv1Loss):
             return results
         else:
             if self.method:
-                return self.compute_loss(preds, targets,useFocal=self.useFocal)
+                return self.compute_loss(preds, targets,useFocal=self.useFocal) # 推荐
             else:
                 return self.compute_loss2(preds, targets,useFocal=self.useFocal)
 

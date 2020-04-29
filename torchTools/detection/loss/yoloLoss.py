@@ -439,12 +439,8 @@ class YOLOv2Loss(YOLOv1Loss):
         # self.bce_loss = nn.BCELoss(reduction='sum')
 
         self.num_anchors = self.PreBoxSize.size(0)
+        self.method = method
 
-
-        if method:
-            self.normalize = self.normalize2
-        else:
-            self.normalize = self.normalize3
 
     def forward(self,preds,targets):
         if "boxes" not in targets[0]:
@@ -453,7 +449,10 @@ class YOLOv2Loss(YOLOv1Loss):
             results = [self.apply_nms(result) for result in results]
             return results
         else:
-            return self.compute_loss(preds, targets,useFocal=self.useFocal)
+            if self.method:
+                return self.compute_loss(preds, targets,useFocal=self.useFocal)
+            else:
+                return self.compute_loss2(preds, targets,useFocal=self.useFocal)
 
     def compute_loss(self,preds_list, targets_origin,useFocal=True,alpha=0.2,gamma=2):
         """
@@ -500,27 +499,35 @@ class YOLOv2Loss(YOLOv1Loss):
                     preds = preds.contiguous().view(-1, 5 + self.num_classes)
                     targets = targets.contiguous().view(-1, 5 + self.num_classes)
 
-                    index = targets[..., 4] == 1
-                    no_index = targets[..., 4] != 1
+                    index = targets[..., 4] > 0
+                    no_index = targets[..., 4] == 0
                     has_obj = preds[index]
                     no_obj = preds[no_index]
                     targ_obj = targets[index]
+                    weight_iou = targ_obj[..., 4]
 
                     loss_conf = sigmoid_focal_loss_jit(has_obj[..., 4],torch.ones_like(has_obj[..., 4]).detach(),
-                                                       alpha,gamma,reduction="sum")
+                                                       alpha,gamma,reduction="None")
                     loss_no_conf = sigmoid_focal_loss_jit(no_obj[..., 4],torch.zeros_like(no_obj[..., 4]).detach(),
                                                           alpha,gamma,reduction="sum")
                     # has_obj[..., :2] = torch.sigmoid(has_obj[..., :2]) # w,h 不使用sigmoid ，因为会出现负值
-                    loss_box = smooth_l1_loss_jit(torch.sigmoid(has_obj[..., :2]), targ_obj[..., :2].detach(),2e-5,reduction="sum")
-                    loss_box += smooth_l1_loss_jit(has_obj[..., 2:4], targ_obj[..., 2:4].detach(),2e-5,reduction="sum")
+                    loss_xy = smooth_l1_loss_jit(torch.sigmoid(has_obj[..., :2]), targ_obj[..., :2].detach(),2e-5,reduction="None")
+                    loss_wh = smooth_l1_loss_jit(has_obj[..., 2:4], targ_obj[..., 2:4].detach(),2e-5,reduction="None")
                     loss_clf = sigmoid_focal_loss_jit(has_obj[..., 5:], targ_obj[..., 5:].detach(),
-                                                      alpha,gamma,reduction="sum")
+                                                      alpha,gamma,reduction="None")
                     loss_no_clf = F.mse_loss(torch.sigmoid(no_obj[..., 5:]), torch.zeros_like(no_obj[..., 5:]).detach(),
                                              reduction="sum")
 
                     # iou loss w,h 会出现负值，不好计算IOU loss
                     # loss_iou = giou_loss_jit(xywh2x1y1x2y2(torch.sigmoid(has_obj[..., :4])),
                     #                          xywh2x1y1x2y2(targ_obj[..., :4]).detach(), reduction="sum")
+
+                    # 加上权重
+                    loss_conf = torch.sum(loss_conf*weight_iou)
+                    loss_xy = torch.sum(loss_xy*weight_iou.unsqueeze(-1))
+                    loss_wh = torch.sum(loss_wh*weight_iou.unsqueeze(-1))
+                    loss_clf = torch.sum(loss_clf*weight_iou)
+                    loss_box = loss_xy+loss_wh
 
 
                 losses["loss_conf"] += loss_conf
@@ -532,62 +539,90 @@ class YOLOv2Loss(YOLOv1Loss):
 
         return losses
 
-    def normalize2(self, featureShape, target):
-        """不做筛选所有的anchor都参与计算"""
-        grid_ceil_h, grid_ceil_w = featureShape
-        h, w = target["resize"]
-        boxes = target["boxes"]
-        if len(boxes)==0:return None
-        if boxes.dim()<2:boxes = boxes.unsqueeze(0)
-        labels = target["labels"]
-        strides_h = h // grid_ceil_h
-        strides_w = w // grid_ceil_w
+    def compute_loss2(self, preds_list, targets_origin, useFocal=True, alpha=0.2, gamma=2):
+        """
+        :param preds:
+                if mulScale: # 使用多尺度（2个特征为例,batch=2）
+                    preds=[[(1,28,28,12),(1,14,14,12)],[(1,28,28,12),(1,14,14,12)]]
+                else: #（2个特征为例,batch=2）
+                   preds=[(2,28,28,12),(2,14,14,12)]
+        :param targets:
+                [{"boxes":(n,4),"labels":(n,)},{"boxes":(m,4),"labels":(m,)}]
+        :return:
+        """
+        losses = {
+            "loss_conf": 0,
+            "loss_no_conf": 0,
+            "loss_box": 0,
+            "loss_clf": 0,
+            "loss_no_clf": 0  # ,
+            # "loss_iou": 0
+        }
 
-        result = torch.zeros([1, grid_ceil_h, grid_ceil_w,  # len(labels)
-                              self.num_anchors, 5 + self.num_classes],
-                             dtype=boxes.dtype,
-                             device=boxes.device)
+        for jj in range(len(targets_origin)):
+            target_origin = targets_origin[jj]
+            if self.mulScale:
+                pred_list = preds_list[jj]
+            else:
+                pred_list = [pred[jj].unsqueeze(0) for pred in preds_list]
 
-        # for idx, (box, label) in enumerate(zip(boxes, labels)):
-        idx = 0
-        box = boxes
-        label = labels
-        # x1,y1,x2,y2->x0,y0,w,h
-        x1 = box[:, 0]
-        y1 = box[:, 1]
-        x2 = box[:, 2]
-        y2 = box[:, 3]
+            for i, preds in enumerate(pred_list):
+                fh, fw = preds.shape[1:-1]
 
-        # [x0,y0,w,h]
-        x0 = (x1 + x2) / 2.
-        y0 = (y1 + y2) / 2.
-        w_b = (x2 - x1) / w
-        h_b = (y2 - y1) / h
+                # normalize
+                targets = self.normalize2((fh, fw), target_origin)
+                if targets is None:
+                    loss_conf = 0 * F.mse_loss(torch.rand([1, 2], device=self.device).detach(),
+                                               torch.rand(1, 2, device=self.device).detach(), reduction="sum")
+                    loss_no_conf = 0 * F.mse_loss(torch.rand([1, 2], device=self.device).detach(),
+                                                  torch.rand(1, 2, device=self.device).detach(), reduction="sum")
+                    loss_box = 0 * F.mse_loss(torch.rand([1, 2], device=self.device).detach(),
+                                              torch.rand(1, 2, device=self.device).detach(), reduction="sum")
+                    loss_clf = 0 * F.mse_loss(torch.rand([1, 2], device=self.device).detach(),
+                                              torch.rand(1, 2, device=self.device).detach(), reduction="sum")
+                    loss_no_clf = 0 * F.mse_loss(torch.rand([1, 2], device=self.device).detach(),
+                                                 torch.rand(1, 2, device=self.device).detach(), reduction="sum")
+                    # loss_iou = 0*F.mse_loss(torch.rand([1,2],device=self.device).detach(),torch.rand(1,2,device=self.device).detach(),reduction="sum")
+                else:
+                    # if useFocal:
+                    # preds = F.sigmoid(preds)  # 不执行
+                    preds = preds.contiguous().view(-1, 5 + self.num_classes)
+                    targets = targets.contiguous().view(-1, 5 + self.num_classes)
 
-        # 判断box落在哪个grid ceil
-        # 取格网左上角坐标
-        grid_ceil = ((x0 / strides_w).int(), (y0 / strides_h).int())
+                    index = targets[..., 4] == 1
+                    no_index = targets[..., 4] != 1
+                    has_obj = preds[index]
+                    no_obj = preds[no_index]
+                    targ_obj = targets[index]
 
-        # normal 0~1
-        # gt_box 中心点坐标-对应grid cell左上角的坐标/ 格网大小使得范围变成0到1
-        x0 = (x0 - grid_ceil[0].float() * strides_w) / w
-        y0 = (y0 - grid_ceil[1].float() * strides_h) / h
+                    loss_conf = sigmoid_focal_loss_jit(has_obj[..., 4], torch.ones_like(has_obj[..., 4]).detach(),
+                                                       alpha, gamma, reduction="sum")
+                    loss_no_conf = sigmoid_focal_loss_jit(no_obj[..., 4], torch.zeros_like(no_obj[..., 4]).detach(),
+                                                          alpha, gamma, reduction="sum")
+                    # has_obj[..., :2] = torch.sigmoid(has_obj[..., :2]) # w,h 不使用sigmoid ，因为会出现负值
+                    loss_box = smooth_l1_loss_jit(torch.sigmoid(has_obj[..., :2]), targ_obj[..., :2].detach(), 2e-5,
+                                                  reduction="sum")
+                    loss_box += smooth_l1_loss_jit(has_obj[..., 2:4], targ_obj[..., 2:4].detach(), 2e-5,
+                                                   reduction="sum")
+                    loss_clf = sigmoid_focal_loss_jit(has_obj[..., 5:], targ_obj[..., 5:].detach(),
+                                                      alpha, gamma, reduction="sum")
+                    loss_no_clf = F.mse_loss(torch.sigmoid(no_obj[..., 5:]), torch.zeros_like(no_obj[..., 5:]).detach(),
+                                             reduction="sum")
 
-        for i, (y, x) in enumerate(zip(grid_ceil[1], grid_ceil[0])):
-            for j in range(self.num_anchors):  # 对应到每个先念框
-                # 计算对应先念框的 h与w
-                pw, ph = self.PreBoxSize[j]
+                    # iou loss w,h 会出现负值，不好计算IOU loss
+                    # loss_iou = giou_loss_jit(xywh2x1y1x2y2(torch.sigmoid(has_obj[..., :4])),
+                    #                          xywh2x1y1x2y2(targ_obj[..., :4]).detach(), reduction="sum")
 
-                result[idx, y, x, j, 0] = x0[i]
-                result[idx, y, x, j, 1] = y0[i]
-                result[idx, y, x, j, 2] = torch.log(w_b[i] / pw)
-                result[idx, y, x, j, 3] = torch.log(h_b[i] / ph)
-                result[idx, y, x, j, 4] = 1  # 置信度
-                result[idx, y, x, j, 5 + int(label[i])] = 1  # 转成one-hot
+                losses["loss_conf"] += loss_conf
+                losses["loss_no_conf"] += loss_no_conf * 0.05  # 0.05
+                losses["loss_box"] += loss_box * 50.  # 50
+                losses["loss_clf"] += loss_clf
+                losses["loss_no_clf"] += loss_no_clf * 0.05
+                # losses["loss_iou"] += loss_iou
 
-        return result
+        return losses
 
-    def normalize3(self, featureShape, target,thred_iou=0.5):
+    def normalize2(self, featureShape, target,thred_iou=0.5):
         """做筛选anchor参与计算(根据IOU筛选)"""
         grid_ceil_h, grid_ceil_w = featureShape
         h, w = target["resize"]
@@ -631,7 +666,7 @@ class YOLOv2Loss(YOLOv1Loss):
         # 找到与哪个先验框的IOU最大
         gt_boxes = boxes / torch.as_tensor([w, h, w, h],dtype=torch.float32, device=self.device).unsqueeze(0) # [x1,y1,x2,y2]
 
-        xy = torch.stack((x0,y0),-1)
+        xy = torch.stack((grid_ceil[0].float() * strides_w / w,grid_ceil[1].float() * strides_h / h),-1)
 
         for i, (y, x) in enumerate(zip(grid_ceil[1], grid_ceil[0])):
             anchors = torch.cat((xy[i].repeat(len(self.PreBoxSize)).view(len(self.PreBoxSize),2), self.PreBoxSize), -1)
@@ -639,16 +674,79 @@ class YOLOv2Loss(YOLOv1Loss):
             anchors = xywh2x1y1x2y2(anchors)
             iou = box_iou(anchors, gt_boxes[i][None, :])
             best_iou, best_anchor = iou.max(dim=0)
-            index = torch.nonzero(iou>thred_iou)[:,0].cpu().numpy().tolist()
-            if best_anchor.cpu().numpy()[0] not in index:index.append(best_anchor.cpu().numpy()[0])
-            for j in index:
+            for j in range(self.num_anchors):  # 对应到每个先念框
+                if iou[j] > thred_iou or j == best_anchor:
+                    # 计算对应先念框的 h与w
+                    pw, ph = self.PreBoxSize[j]
+                    result[idx, y, x, j, 0] = x0[i]
+                    result[idx, y, x, j, 1] = y0[i]
+                    result[idx, y, x, j, 2] = torch.log(w_b[i] / pw)
+                    result[idx, y, x, j, 3] = torch.log(h_b[i] / ph)
+                    result[idx, y, x, j, 4] = 1  # 置信度
+                    result[idx, y, x, j, 5 + int(label[i])] = 1  # 转成one-hot
+
+        return result
+
+    def normalize(self, featureShape, target):
+        """做筛选anchor参与计算(根据IOU筛选)"""
+        grid_ceil_h, grid_ceil_w = featureShape
+        h, w = target["resize"]
+        boxes = target["boxes"]
+        if len(boxes)==0:return None
+        if boxes.dim()<2:boxes = boxes.unsqueeze(0)
+        labels = target["labels"]
+        strides_h = h // grid_ceil_h
+        strides_w = w // grid_ceil_w
+
+        result = torch.zeros([1, grid_ceil_h, grid_ceil_w,  # len(labels)
+                              self.num_anchors, 5 + self.num_classes],
+                             dtype=boxes.dtype,
+                             device=boxes.device)
+
+        # for idx, (box, label) in enumerate(zip(boxes, labels)):
+        idx = 0
+        box = boxes
+        label = labels
+        # x1,y1,x2,y2->x0,y0,w,h
+        x1 = box[:, 0]
+        y1 = box[:, 1]
+        x2 = box[:, 2]
+        y2 = box[:, 3]
+
+        # [x0,y0,w,h]
+        x0 = (x1 + x2) / 2.
+        y0 = (y1 + y2) / 2.
+        w_b = (x2 - x1) / w
+        h_b = (y2 - y1) / h
+
+        # 判断box落在哪个grid ceil
+        # 取格网左上角坐标
+        grid_ceil = ((x0 / strides_w).int(), (y0 / strides_h).int())
+
+        # normal 0~1
+        # gt_box 中心点坐标-对应grid cell左上角的坐标/ 格网大小使得范围变成0到1
+        x0 = (x0 - grid_ceil[0].float() * strides_w) / w
+        y0 = (y0 - grid_ceil[1].float() * strides_h) / h
+
+        # 找到与哪个先验框的IOU最大
+        gt_boxes = boxes / torch.as_tensor([w, h, w, h],dtype=torch.float32, device=self.device).unsqueeze(0) # [x1,y1,x2,y2]
+
+        xy = torch.stack((grid_ceil[0].float() * strides_w / w,grid_ceil[1].float() * strides_h / h),-1)
+
+        for i, (y, x) in enumerate(zip(grid_ceil[1], grid_ceil[0])):
+            anchors = torch.cat((xy[i].repeat(len(self.PreBoxSize)).view(len(self.PreBoxSize),2), self.PreBoxSize), -1)
+            # to x1y1x2y2
+            anchors = xywh2x1y1x2y2(anchors)
+            iou = box_iou(anchors, gt_boxes[i][None, :])
+            best_iou, best_anchor = iou.max(dim=0)
+            for j in range(self.num_anchors):  # 对应到每个先念框
                 # 计算对应先念框的 h与w
                 pw, ph = self.PreBoxSize[j]
                 result[idx, y, x, j, 0] = x0[i]
                 result[idx, y, x, j, 1] = y0[i]
                 result[idx, y, x, j, 2] = torch.log(w_b[i] / pw)
                 result[idx, y, x, j, 3] = torch.log(h_b[i] / ph)
-                result[idx, y, x, j, 4] = 1  # 置信度
+                result[idx, y, x, j, 4] = max(best_iou,0.5) if j==best_anchor else iou[j] # 置信度(用于设置权重)
                 result[idx, y, x, j, 5 + int(label[i])] = 1  # 转成one-hot
 
         return result

@@ -427,7 +427,7 @@ if __name__=="__main__":
     basePath = "./models/"
     model = SSD(traindataPath, testdataPath, preddataPath,"resnet18", pretrained=False, num_features=1,resize=(96,96),
                    isTrain=False, num_anchors=3, mulScale=False, epochs=400, print_freq=40,dropRate=0.0,
-                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,clip=True,train_method=1,
+                   basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=5e-4, batch_size=2,clip=True,train_method=1,
                    conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,freeze_at=0)
 
     model()

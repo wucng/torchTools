@@ -510,8 +510,9 @@ class YOLOv2Loss(YOLOv1Loss):
                                                        alpha,gamma,reduction="sum")
                     loss_no_conf = sigmoid_focal_loss_jit(no_obj[..., 4],torch.zeros_like(no_obj[..., 4]).detach(),
                                                           alpha,gamma,reduction="sum")
-                    has_obj[..., :2] = torch.sigmoid(has_obj[..., :2]) # w,h 不使用sigmoid ，因为会出现负值
-                    loss_box = smooth_l1_loss_jit(has_obj[..., :4], targ_obj[..., :4].detach(),2e-5,reduction="sum")
+                    # has_obj[..., :2] = torch.sigmoid(has_obj[..., :2]) # w,h 不使用sigmoid ，因为会出现负值
+                    loss_box = smooth_l1_loss_jit(torch.sigmoid(has_obj[..., :2]), targ_obj[..., :2].detach(),2e-5,reduction="sum")
+                    loss_box += smooth_l1_loss_jit(has_obj[..., 2:4], targ_obj[..., 2:4].detach(),2e-5,reduction="sum")
                     loss_clf = sigmoid_focal_loss_jit(has_obj[..., 5:], targ_obj[..., 5:].detach(),
                                                       alpha,gamma,reduction="sum")
                     loss_no_clf = F.mse_loss(torch.sigmoid(no_obj[..., 5:]), torch.zeros_like(no_obj[..., 5:]).detach(),

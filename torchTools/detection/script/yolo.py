@@ -25,8 +25,9 @@ import cv2,os,time
 from PIL import Image
 import PIL.Image
 import matplotlib.pyplot as plt
+# import matplotlib; matplotlib.use('TkAgg')
 from torch.utils.tensorboard import SummaryWriter
-
+# os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
 def collate_fn(batch_data):
     data_list = []
@@ -430,16 +431,13 @@ if __name__=="__main__":
     # """
 
     basePath = "./models/"
-    # model = YOLO(traindataPath, testdataPath, preddataPath,"resnet18", pretrained=False, num_features=1,resize=(96,96),
-    #                isTrain=True, num_anchors=2, mulScale=False, epochs=400, print_freq=40,dropRate=0.0,
-    #                basePath=basePath, threshold_conf=0.5, threshold_cls=0.5, lr=2e-3, batch_size=2,freeze_at=0,
-    #                conf_thres=0.7, nms_thres=0.4, classes=classes,typeOfData=typeOfData,usize=256,version="v2")
 
-    model = YOLO(traindataPath, testdataPath, preddataPath, "resnet34", pretrained=False, num_features=1, resize=(96,96),
-             isTrain=True, num_anchors=2, mulScale=False, epochs=50, print_freq=50, dropRate=0.0,
+    model = YOLO(traindataPath, testdataPath, preddataPath, "resnet18", pretrained=False, num_features=2, resize=(96,96),
+             isTrain=False, num_anchors=2, mulScale=False, epochs=50, print_freq=50, dropRate=0.0,
              basePath=basePath, threshold_conf=0.3, threshold_cls=0.3, lr=5e-4, batch_size=2, freeze_at=0,
              conf_thres=0.3, nms_thres=0.4, classes=classes, typeOfData=typeOfData, usize=256, version="v1",
              useFocal=True, train_method=0, method=1)
 
-    # model()
-    model.eval()
+    model()
+    # model.predict()
+    # model.eval()

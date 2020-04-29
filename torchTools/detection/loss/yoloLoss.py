@@ -270,7 +270,7 @@ class YOLOv1Loss(nn.Module):
 
                     # 过滤分类分数低的
                     # keep = torch.nonzero(scores > self.threshold_cls).squeeze(1)
-                    keep = torch.nonzero(scores > self.threshold_cls)
+                    keep = torch.nonzero(scores > self.threshold_cls).squeeze(1)
                     if len(keep)==0:
                         pred_box = torch.zeros([1, 4], dtype=pred_box.dtype, device=pred_box.device)
                         scores = torch.zeros([1, 1], dtype=pred_box.dtype, device=pred_box.device)

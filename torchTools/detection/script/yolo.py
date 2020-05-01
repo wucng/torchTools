@@ -431,7 +431,7 @@ if __name__=="__main__":
     # """
 
     basePath = "./models/"
-
+    # train_method=1 推荐这种方式训练
     model = YOLO(traindataPath, testdataPath, preddataPath, "resnet18", pretrained=False, num_features=1, resize=(96,96),
              isTrain=True, num_anchors=2, mulScale=False, epochs=50, print_freq=50, dropRate=0.0,
              basePath=basePath, threshold_conf=0.3, threshold_cls=0.3, lr=5e-4, batch_size=2, freeze_at=0,

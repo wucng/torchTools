@@ -433,7 +433,9 @@ class YOLOv2Loss(YOLOv1Loss):
 
         # self.PreBoxSize = torch.as_tensor([(1.0, 1.0), (0.5, 0.5), (0.25, 0.25),(0.5,0.25),(0.25,0.5)], dtype=torch.float32,
         #                                   device=self.device)
-        self.PreBoxSize = torch.as_tensor([(0.1, 0.3),(0.3, 0.1),(0.1, 0.1)], dtype=torch.float32,device=self.device)
+        # self.PreBoxSize = torch.as_tensor([(0.1, 0.3),(0.3, 0.1),(0.1, 0.1)], dtype=torch.float32,device=self.device)
+        self.PreBoxSize = torch.as_tensor([(0.2,0.4),(0.4,0.2),(0.1, 0.3),(0.3, 0.1),(0.1, 0.1),(0.05,0.05)],
+                                          dtype=torch.float32,device=self.device)
 
         # self.mse_loss = nn.MSELoss(reduction='sum')
         # self.bce_loss = nn.BCELoss(reduction='sum')

@@ -27,7 +27,7 @@ import cv2,os,time
 from PIL import Image
 import PIL.Image
 import matplotlib.pyplot as plt
-# import matplotlib; matplotlib.use('TkAgg')
+import matplotlib; matplotlib.use('TkAgg')
 from torch.utils.tensorboard import SummaryWriter
 os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
@@ -52,6 +52,8 @@ class YOLO(nn.Module):
         num_classes = len(self.classes)
         self.train_method = cfg["work"]["train"]["train_method"]
         typeOfData = cfg["work"]["dataset"]["typeOfData"]
+        version = cfg["work"]["train"]["version"]
+
 
         trainDP = cfg["work"]["dataset"]["trainDataPath"]
         testDP = cfg["work"]["dataset"]["testDataPath"]
@@ -137,7 +139,10 @@ class YOLO(nn.Module):
             self.pred_loader = DataLoader(pred_dataset, batch_size=self.batch_size, shuffle=False,
                                           collate_fn=collate_fn, **kwargs)
 
-        self.loss_func = yoloLoss.YOLOv1Loss(cfg,self.device)
+        if version=="v1":
+            self.loss_func = yoloLoss.YOLOv1Loss(cfg,self.device)
+        else:
+            self.loss_func = yoloLoss.YOLOv2Loss(cfg, self.device)
         self.network = net.Network(cfg)
         if use_FPN:self.network.fpn.apply(net.weights_init_fpn) # backbone 不使用
         self.network.rpn.apply(net.weights_init_rpn)
@@ -150,27 +155,9 @@ class YOLO(nn.Module):
 
         self.save_model = os.path.join(basePath,save_model)
         if os.path.exists(self.save_model):
-            # self.network.load_state_dict(torch.load(self.save_model))
-            self.network.load_state_dict(torch.load(self.save_model,map_location=torch.device('cpu')))
+            self.network.load_state_dict(torch.load(self.save_model))
+            # self.network.load_state_dict(torch.load(self.save_model,map_location=torch.device('cpu')))
 
-        """
-        # optimizer
-        base_params = list(
-            map(id, self.network.backbone.parameters())
-        )
-        logits_params = filter(lambda p: id(p) not in base_params, self.network.parameters())
-
-        params = [
-            {"params": logits_params, "lr": lr},  # 1e-3
-            {"params": self.network.backbone.parameters(), "lr": lr / 10},  # 1e-4
-        ]
-
-        # self.optimizer = torch.optim.Adam(self.network.parameters(), lr=lr, weight_decay=4e-05)
-        # self.optimizer = torch.optim.Adam(params, weight_decay=4e-05)
-        self.optimizer = optimizer.RAdam(params, weight_decay=4e-05)
-        
-        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer, step_size=20, gamma=0.1)
-        """
         self.optimizer = optimizer.build_optimizer(self.network,cfg)
         self.lr_scheduler = optimizer.build_lr_scheduler(self.optimizer,cfg)
 
@@ -341,42 +328,63 @@ if __name__=="__main__":
     typeOfData = "PascalVOCDataset"
     # """
     basePath = "./models/"
+    resize = (224,224)
+
     cfg = config.get_cfg()
     cfg["work"]["dataset"]["trainDataPath"] = traindataPath
     cfg["work"]["dataset"]["testDataPath"] = testdataPath
     cfg["work"]["dataset"]["predDataPath"] = preddataPath
     cfg["work"]["dataset"]["typeOfData"] = typeOfData
     cfg["work"]["save"]["basePath"] = basePath
-    cfg["network"]["backbone"]["model_name"]="resnet34"
-    cfg["network"]["backbone"]["pretrained"]=True
-    cfg["work"]["train"]["resize"]=(224,224)
-    cfg["work"]["train"]["epochs"]=30
-    cfg["work"]["train"]["classes"]=classes
-    cfg["network"]["backbone"]["freeze_at"]="res2"
-    cfg["network"]["RPN"]["num_boxes"]=2
-    cfg["network"]["RPN"]["num_classes"]=len(classes)
-    cfg["work"]["loss"]["alpha"]=0.4
-    cfg["work"]["loss"]["threshold_conf"]=0.2
-    cfg["work"]["loss"]["threshold_cls"]=0.2
-    cfg["work"]["loss"]["conf_thres"]=0.2
+    cfg["network"]["backbone"]["model_name"] = "resnet34"
+    cfg["network"]["backbone"]["pretrained"] = True
+    cfg["work"]["train"]["resize"] = resize
+    cfg["work"]["train"]["epochs"] = 50
+    cfg["work"]["train"]["classes"] = classes
+    cfg["work"]["train"]["useImgaug"] = True
+    cfg["work"]["train"]["version"] = "v2"
+    cfg["work"]["train"]["method"] = 1
+    cfg["network"]["backbone"]["freeze_at"] = "res2"
+    cfg["network"]["RPN"]["num_boxes"] = 6 # 2
+    cfg["network"]["RPN"]["num_classes"] = len(classes)
+    cfg["work"]["loss"]["alpha"] = 0.2
+    cfg["work"]["loss"]["threshold_conf"] = 0.2
+    cfg["work"]["loss"]["threshold_cls"] = 0.2
+    cfg["work"]["loss"]["conf_thres"] = 0.4
 
-    """
-    cfg["network"]["backbone"]["strides"] = [8]
+    # """
     cfg["network"]["FPN"]["use_FPN"] = True
-    cfg["network"]["FPN"]["out_features"] = ["p3"]
+    cfg["network"]["FPN"]["out_features"] = ["p3","p5"]
     cfg["network"]["RPN"]["in_channels"] = 256
     """
     cfg["network"]["backbone"]["out_features"]=["res5"]
-    cfg["network"]["backbone"]["strides"] = [32]
     cfg["network"]["FPN"]["use_FPN"] = False
-    # cfg["network"]["FPN"]["out_features"] = ["p3"]
     cfg["network"]["RPN"]["in_channels"] = 512
     # """
+    index = cfg["network"]["backbone"]["index"]
+    if cfg["network"]["FPN"]["use_FPN"]:
+        name_features = cfg["network"]["FPN"]["name_features"]
+        out_features = cfg["network"]["FPN"]["out_features"]
+        for out in out_features:
+            index.append(name_features.index(out))
+    else:
+        name_features = cfg["network"]["backbone"]["name_features"]
+        out_features = cfg["network"]["backbone"]["out_features"]
+        for out in out_features:
+            index.append(name_features.index(out))
 
+    cfg["network"]["backbone"]["strides"] =[value for i,value in
+                                enumerate(cfg["network"]["backbone"]["strides"]) if i in index]
+    cfg["network"]["prioriBox"]["min_sizes"] = [value for i,value in
+                                enumerate(cfg["network"]["prioriBox"]["min_sizes"]) if i in index]
+    cfg["network"]["prioriBox"]["max_sizes"] = [value for i,value in
+                                enumerate(cfg["network"]["prioriBox"]["max_sizes"]) if i in index]
+    cfg["network"]["prioriBox"]["aspect_ratios"] = [value for i,value in
+                                enumerate(cfg["network"]["prioriBox"]["aspect_ratios"]) if i in index]
 
     # train_method=1 推荐这种方式训练
     model = YOLO(cfg)
 
-    model()
-    # model.predict(5)
+    # model()
+    model.predict(5)
     # model.eval()

@@ -5,9 +5,11 @@ _cfg = {
             "pretrained":False,
             "dropRate":0.5,
             "freeze_at":"res2",
+            "name_features":["res2","res3","res4","res5"],
             "out_features":["res2","res3","res4","res5"],
             # "out_features":["res5"],
-            "strides":[4,8,16,32]
+            "strides":[4,8,16,32],
+            "index":[]
         },
         "FPN":{
             "use_FPN":True,
@@ -21,6 +23,16 @@ _cfg = {
             "in_channels":256,
             "num_boxes":2,
             "num_classes":1 # 不包括背景
+        },
+        # ssd对应得先验框
+        "prioriBox":{
+            "min_dim":300,
+            "min_sizes":[30,60,111,162],
+            "max_sizes":[60,111,162,213],
+            "aspect_ratios":[[2,3],[2,3],[2,3],[2,3]], #[[2],[2],[2],[2]]
+            "variance":[0.1,0.2],
+            "clip":True,
+            "thred_iou":0.5
         }
     },
     "work":{
@@ -45,6 +57,7 @@ _cfg = {
             "useImgaug":True,
             # "lr":5e-4,
             "train_method":1,
+            "method":0,
 
             "classes":[],
             "filter_labels":[],

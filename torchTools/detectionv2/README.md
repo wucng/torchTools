@@ -49,6 +49,7 @@ cfg["network"]["backbone"]["strides"] = [8]
 cfg["network"]["FPN"]["use_FPN"] = True
 cfg["network"]["FPN"]["out_features"] = ["p3"]
 cfg["network"]["RPN"]["in_channels"] = 256
+cfg["network"]["backbone"]["out_features"]=["res2","res3","res4","res5"]
 """
 cfg["network"]["backbone"]["out_features"]=["res5"]
 cfg["network"]["backbone"]["strides"] = [32]

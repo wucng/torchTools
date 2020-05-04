@@ -106,14 +106,14 @@ class YOLO(nn.Module):
                 Data = datasets.PascalVOCDataset
             else:
                 pass
-            train_dataset = Data(trainDP,transforms=train_transforms,classes=classes)
+            train_dataset = Data(trainDP,transforms=train_transforms,classes=self.classes)
 
 
             if testDP is not None:
-                test_dataset = Data(testDP,transforms=test_transforms,classes=classes)
+                test_dataset = Data(testDP,transforms=test_transforms,classes=self.classes)
 
             else:
-                test_dataset = Data(trainDP,test_transforms, classes=classes)
+                test_dataset = Data(trainDP,test_transforms, classes=self.classes)
                 num_datas = len(train_dataset)
                 num_train = int(0.8*num_datas)
                 indices = torch.randperm(num_datas).tolist()

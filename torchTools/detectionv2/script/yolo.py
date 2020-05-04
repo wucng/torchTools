@@ -295,14 +295,14 @@ class YOLO(nn.Module):
                     if pred is None:continue
                     path = target[i]["path"]
                     image = np.asarray(PIL.Image.open(path).convert("RGB"), np.uint8)
-                    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+                    # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
                     image = self.draw_rect(image,pred)
 
-                    cv2.imshow("test", image)
-                    cv2.waitKey(0)
-                    cv2.destroyAllWindows()
-                    # plt.imshow(image)
-                    # plt.show()
+                    # cv2.imshow("test", image)
+                    # cv2.waitKey(0)
+                    # cv2.destroyAllWindows()
+                    plt.imshow(image)
+                    plt.show()
                     # PIL.Image.fromarray(image).show()
 
                     # save

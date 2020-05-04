@@ -341,7 +341,7 @@ if __name__=="__main__":
     cfg["work"]["train"]["resize"] = resize
     cfg["work"]["train"]["epochs"] = 50
     cfg["work"]["train"]["classes"] = classes
-    cfg["work"]["train"]["useImgaug"] = True
+    cfg["work"]["train"]["useImgaug"] = False
     cfg["work"]["train"]["version"] = "v2"
     cfg["work"]["train"]["method"] = 1
     cfg["network"]["backbone"]["freeze_at"] = "res2"
@@ -354,7 +354,7 @@ if __name__=="__main__":
 
     # """
     cfg["network"]["FPN"]["use_FPN"] = True
-    cfg["network"]["FPN"]["out_features"] = ["p3","p5"]
+    cfg["network"]["FPN"]["out_features"] = ["p3","p4"]
     cfg["network"]["RPN"]["in_channels"] = 256
     """
     cfg["network"]["backbone"]["out_features"]=["res5"]
@@ -385,6 +385,6 @@ if __name__=="__main__":
     # train_method=1 推荐这种方式训练
     model = YOLO(cfg)
 
-    # model()
-    model.predict(5)
+    model()
+    # model.predict(5)
     # model.eval()

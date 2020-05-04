@@ -1,4 +1,4 @@
-cfg = {
+_cfg = {
     "network":{
         "backbone":{
             "model_name":"resnet18",

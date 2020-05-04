@@ -63,8 +63,8 @@ cfg = {
             "useFocal":True,
             "alpha":0.2,#0.4
             "gamma":2,
-            "threshold_conf":0.1,
-            "threshold_cls":0.1,
+            "threshold_conf":0.3,
+            "threshold_cls":0.3,
             "conf_thres":0.3,
             "nms_thres":0.4,
         }

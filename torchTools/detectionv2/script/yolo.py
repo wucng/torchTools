@@ -1,5 +1,5 @@
 try:
-    from .tools.engine import train_one_epoch2, evaluate2
+    from ..tools.engine import train_one_epoch2, evaluate2
     from ..network import net
     from ..loss import yoloLoss
     from ..datasets import datasets, bboxAug
@@ -7,7 +7,6 @@ try:
     from ..optm import optimizer
     from ..config import config
 except:
-    from tools.engine import train_one_epoch2, evaluate2
     import sys
     sys.path.append("..")
     from network import net
@@ -16,6 +15,7 @@ except:
     from visual import opencv
     from optm import optimizer
     from config import config
+    from tools.engine import train_one_epoch2, evaluate2
 
 from torch import nn
 import torch
@@ -355,6 +355,11 @@ if __name__=="__main__":
     cfg["network"]["backbone"]["freeze_at"]="res2"
     cfg["network"]["RPN"]["num_boxes"]=2
     cfg["network"]["RPN"]["num_classes"]=len(classes)
+    cfg["work"]["loss"]["alpha"]=0.4
+    cfg["work"]["loss"]["threshold_conf"]=0.2
+    cfg["work"]["loss"]["threshold_cls"]=0.2
+    cfg["work"]["loss"]["conf_thres"]=0.2
+
     """
     cfg["network"]["backbone"]["strides"] = [8]
     cfg["network"]["FPN"]["use_FPN"] = True

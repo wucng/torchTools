@@ -65,8 +65,8 @@ class YOLO(nn.Module):
         summaryPath = cfg["work"]["save"]["summaryPath"]
         # lr = cfg["work"]["train"]["lr"]
 
-        # seed = 100
-        seed = int(time.time() * 1000)
+        seed = 100
+        # seed = int(time.time() * 1000)
         self.use_cuda = torch.cuda.is_available()
         self.device = torch.device("cuda" if self.use_cuda else "cpu")
         torch.manual_seed(seed)
@@ -349,7 +349,7 @@ if __name__=="__main__":
     cfg["work"]["save"]["basePath"] = basePath
     cfg["network"]["backbone"]["model_name"]="resnet34"
     cfg["network"]["backbone"]["pretrained"]=True
-    cfg["work"]["train"]["resize"]=(416,416)
+    cfg["work"]["train"]["resize"]=(224,224)
     cfg["work"]["train"]["epochs"]=30
     cfg["work"]["train"]["classes"]=classes
     cfg["network"]["backbone"]["freeze_at"]="res2"
@@ -377,6 +377,6 @@ if __name__=="__main__":
     # train_method=1 推荐这种方式训练
     model = YOLO(cfg)
 
-    # model()
-    model.predict(5)
+    model()
+    # model.predict(5)
     # model.eval()

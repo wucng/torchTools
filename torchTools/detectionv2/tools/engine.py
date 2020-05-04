@@ -72,10 +72,7 @@ def train_one_epoch2(model,loss_func,optimizer, data_loader, device, epoch, prin
 
             targets = [{k: v.to(device) for k, v in t.items()} for t in targets]
 
-        if mulScale:
-            output = [model(image.unsqueeze(0)) for image in images]
-        else:
-            output = model(images)
+        output = model(images)
 
         loss_dict = loss_func(output, targets)
 
@@ -183,10 +180,7 @@ def evaluate2(model,loss_func, data_loader, device):
         torch.cuda.synchronize()
         model_time = time.time()
 
-        if mulScale:
-            output = [model(img.unsqueeze(0)) for img in image]
-        else:
-            output = model(image)
+        output = model(image)
         outputs = loss_func(output, targets)
 
         # outputs = [{k: torch.stack(v).to(cpu_device) for k, v in t.items()} for t in outputs]

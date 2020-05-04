@@ -1,7 +1,7 @@
 import json
-from .defaults import _cfg
 
 def get_cfg():
+    from .defaults import _cfg
     return _cfg.copy()
 
 def merge_from_cfg(cfg,cfg2):

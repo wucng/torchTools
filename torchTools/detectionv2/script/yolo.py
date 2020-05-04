@@ -27,9 +27,9 @@ import cv2,os,time
 from PIL import Image
 import PIL.Image
 import matplotlib.pyplot as plt
-import matplotlib; matplotlib.use('TkAgg')
+# import matplotlib; matplotlib.use('TkAgg')
 from torch.utils.tensorboard import SummaryWriter
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+# os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 
 def collate_fn(batch_data):
     data_list = []

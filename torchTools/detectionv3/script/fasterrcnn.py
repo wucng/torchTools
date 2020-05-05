@@ -232,13 +232,13 @@ class Fasterrcnn(nn.Module):
                 if _detections is None:
                     # cv2.imwrite(filename.replace("image","out"),image)
                     continue
-                image = self.draw_rect(image, _detections)
-                cv2.imshow("test", image)
-                cv2.waitKey(0)
-                cv2.destroyAllWindows()
+                # image = self.draw_rect(image, _detections)
+                # cv2.imshow("test", image)
+                # cv2.waitKey(0)
+                # cv2.destroyAllWindows()
 
-                # plt.imshow(image)
-                # plt.show()
+                plt.imshow(image)
+                plt.show()
 
                 # save
                 # newPath = path.replace("PNGImages", "result")

@@ -154,9 +154,8 @@ class Fasterrcnn(nn.Module):
 
         # and a learning rate scheduler which decreases the learning rate by
         # 10x every 3 epochs
-        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer,
-                                                       step_size=3,
-                                                       gamma=0.1)
+        # self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer,step_size=3,gamma=0.1)
+        self.lr_scheduler = optimizer.build_lr_scheduler(self.optimizer)
         """
         self.optimizer = optimizer.build_optimizer(self.network,lr,clip_gradients=True)
         self.lr_scheduler = optimizer.build_lr_scheduler(self.optimizer)
@@ -229,16 +228,16 @@ class Fasterrcnn(nn.Module):
                 # image = cv2.imread(filename)
                 image = np.asarray(Image.open(filename).convert("RGB"), np.uint8)
                 _detections = detections[idx]
-                if _detections is None:
+                if _detections is None or len(_detections)==0:
                     # cv2.imwrite(filename.replace("image","out"),image)
                     continue
-                # image = self.draw_rect(image, _detections)
-                # cv2.imshow("test", image)
-                # cv2.waitKey(0)
-                # cv2.destroyAllWindows()
+                image = self.draw_rect(image, _detections)
+                cv2.imshow("test", image)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
 
-                plt.imshow(image)
-                plt.show()
+                # plt.imshow(image)
+                # plt.show()
 
                 # save
                 # newPath = path.replace("PNGImages", "result")
@@ -271,7 +270,7 @@ if __name__ == "__main__":
     typeOfData = "PennFudanDataset"
 
     model = Fasterrcnn(traindataPath, classes, "resnet18", pretrained=True,
-                       out_channels=256,use_FPN=True,lr=5e-4,num_epochs=10,
+                       out_channels=256,use_FPN=True,lr=5e-3,num_epochs=10,
                        print_freq=20,box_score_thresh=0.3,box_nms_thresh=0.4,
                        batch_size=2,basePath=basePath,typeOfData=typeOfData)
 

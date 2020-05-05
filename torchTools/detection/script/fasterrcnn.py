@@ -78,7 +78,7 @@ except:
     from datasets import bboxAug
 
 
-def get_transform2(train,advanced=False):
+def get_transform(train,advanced=False):
     transforms = []
     if train:
         # during training, randomly flip the training images
@@ -105,7 +105,7 @@ def get_transform2(train,advanced=False):
 
     return T.Compose(transforms)
 
-def get_transform(train):
+def get_transform2(train):
     transforms = []
     # converts the image, a PIL image, into a PyTorch Tensor
     transforms.append(T.ToTensor())
@@ -247,12 +247,12 @@ class Fasterrcnn(nn.Module):
                     # cv2.imwrite(filename.replace("image","out"),image)
                     continue
                 image = self.draw_rect(image, _detections)
-                # cv2.imshow("test", image)
-                # cv2.waitKey(0)
-                # cv2.destroyAllWindows()
+                cv2.imshow("test", image)
+                cv2.waitKey(0)
+                cv2.destroyAllWindows()
 
-                plt.imshow(image)
-                plt.show()
+                # plt.imshow(image)
+                # plt.show()
 
                 # save
                 # newPath = path.replace("PNGImages", "result")
@@ -343,12 +343,12 @@ if __name__ == "__main__":
     basePath = "./models"
 
     model = Fasterrcnn(traindataPath, classes, "resnet18", pretrained=True, num_epochs=10,
-                       conf_thres=0.7, nms_thres=0.4, batch_size=2,usize=256,lr=5e-3,
-                       use_FPN=False, basePath=basePath, useMask=False, selfmodel=True)
+                       conf_thres=0.5, nms_thres=0.4, batch_size=2,usize=256,lr=5e-3,
+                       use_FPN=True, basePath=basePath, useMask=False, selfmodel=True)
 
-    model()
+    # model()
 
-    # model.predict(testdataPath,3)
+    model.predict(testdataPath,3)
 
     """
     import torch

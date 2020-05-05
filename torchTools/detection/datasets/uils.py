@@ -183,7 +183,7 @@ def run_seq2():
     seq = iaa.Sequential([
         iaa.Fliplr(0.5),  # horizontal flips
         # iaa.Crop(percent=(0, 0.1)),  # random crops
-        iaa.Crop(percent=(0, 0.05)),  # random crops
+        iaa.Crop(percent=(0, 0.01)),  # random crops
         # Small gaussian blur with random sigma between 0 and 0.5.
         # But we only blur about 50% of all images.
         iaa.Sometimes(
@@ -213,9 +213,9 @@ def run_seq2():
         iaa.Sometimes(0.5,
         iaa.Affine(
             scale={"x": (0.8, 1.2), "y": (0.8, 1.2)},
-            translate_percent={"x": (-0.05, 0.05), "y": (-0.05, 0.05)},
-            rotate=(-5, 5),
-            shear=(-4, 4)
+            translate_percent={"x": (-0.1, 0.1), "y": (-0.1, 0.1)},
+            rotate=(-3, 3),
+            shear=(-2, 2)
         ))
 
     ], random_order=True)  # apply augmenters in random order

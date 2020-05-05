@@ -58,9 +58,10 @@ class ToTensor(object):
 class Normalize(object):
     def __init__(self,image_mean=None,image_std=None):
         if image_mean is None:
-            image_mean = [0.485, 0.456, 0.406]
+            image_mean = [0.485, 0.456, 0.406] # RGB格式
         if image_std is None:
-            image_std = [0.229, 0.224, 0.225]
+            # image_std = [0.229, 0.224, 0.225] # ImageNet std
+            image_std = [1.0, 1.0, 1.0]
         self.image_mean = image_mean
         self.image_std = image_std
 
@@ -73,8 +74,8 @@ class Normalize(object):
                 target: Tensor
         """
         dtype, device = image.dtype, image.device
-        mean = torch.as_tensor(self.image_mean, dtype=dtype, device=device)
-        std = torch.as_tensor(self.image_std, dtype=dtype, device=device)
+        mean = torch.as_tensor(self.image_mean, dtype=torch.float32, device=device)
+        std = torch.as_tensor(self.image_std, dtype=torch.float32, device=device)
         image = (image - mean[:, None, None]) / std[:, None, None]
         return image,target
 
@@ -104,14 +105,14 @@ class Pad(object):
             pad_list = [[0, 0], [diff // 2, diff - diff // 2], [0, 0]]
             if "boxes" in target:
                 boxes = [[b[0] + diff // 2, b[1], b[2] + diff - diff // 2, b[3]] for b in boxes]
-                boxes = torch.as_tensor(boxes)
+                boxes = torch.as_tensor(boxes,dtype=torch.float32)
 
         else:
             diff = w - h
             pad_list = [[diff // 2, diff - diff // 2], [0, 0], [0, 0]]
             if "boxes" in target:
                 boxes = [[b[0], b[1] + diff // 2, b[2], b[3] + diff - diff // 2] for b in boxes]
-                boxes = torch.as_tensor(boxes)
+                boxes = torch.as_tensor(boxes,dtype=torch.float32)
 
         img = np.pad(img, pad_list, mode=self.mode, constant_values=self.value)
 
@@ -317,7 +318,7 @@ class RandomHorizontalFlip(object):
         img = np.asarray(img)
         img_center = np.array(img.shape[:2])[::-1] / 2
         img_center = np.hstack((img_center, img_center))
-        img_center = torch.as_tensor(img_center)
+        img_center = torch.as_tensor(img_center,dtype=torch.float32)
         bboxes = target["boxes"]
         if random.random() < self.p:
             img = img[:, ::-1, :]
@@ -343,7 +344,7 @@ class RandomVerticallyFlip(object):
         img = np.asarray(img)
         img_center = np.array(img.shape[:2])[::-1] / 2
         img_center = np.hstack((img_center, img_center))
-        img_center = torch.as_tensor(img_center)
+        img_center = torch.as_tensor(img_center,dtype=torch.float32)
         bboxes = target["boxes"]
         if random.random() < self.p:
             img = img[::-1, :, :]
@@ -403,7 +404,7 @@ class RandomScale(object):
         img = canvas
         bboxes = clip_box(bboxes, [0, 0, 1 + img_shape[1], img_shape[0]], 0.25)
 
-        target["boxes"] = torch.as_tensor(bboxes)
+        target["boxes"] = torch.as_tensor(bboxes,dtype=torch.float32)
 
         return PIL.Image.fromarray(img), target
 
@@ -424,7 +425,7 @@ class RandomScale2(object):
             scale_tensor = torch.FloatTensor([[self.scale, 1, self.scale, 1]]).expand_as(boxes)
             boxes = boxes * scale_tensor
 
-            target["boxes"] = torch.as_tensor(boxes)
+            target["boxes"] = torch.as_tensor(boxes,dtype=torch.float32)
             img = PIL.Image.fromarray(img)
 
         return img, target
@@ -480,7 +481,7 @@ class RandomTranslate(object):
 
         bboxes = clip_box(bboxes, [0, 0, img_shape[1], img_shape[0]], 0.25)
 
-        target["boxes"] = torch.as_tensor(bboxes)
+        target["boxes"] = torch.as_tensor(bboxes,dtype=torch.float32)
 
         return PIL.Image.fromarray(img), target
 
@@ -528,7 +529,7 @@ class RandomRotate(object):
 
         bboxes = clip_box(bboxes, [0, 0, w, h], 0.25)
 
-        target["boxes"] = torch.as_tensor(bboxes)
+        target["boxes"] = torch.as_tensor(bboxes,dtype=torch.float32)
 
         return PIL.Image.fromarray(img), target
 

@@ -438,6 +438,41 @@ class RPN(nn.Module):
 
         return last_pred_cls, last_pred_box
 
+
+class RCNN(nn.Module):
+    def __init__(self, cfg):
+        super(RCNN, self).__init__()
+        in_channels = cfg["network"]["RCNN"]["in_channels"]
+        # num_boxes = cfg["network"]["RCNN"]["num_boxes"]
+        num_classes = cfg["network"]["RCNN"]["num_classes"]
+        self.num_classes = num_classes+1
+        # self.num_boxes = num_boxes
+        # 3x3 conv for the hidden representation
+        self.conv = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.AdaptiveAvgPool2d((1,1))
+        )
+        # 1x1 conv for predicting objectness logits # +1 包括背景
+        self.pred_cls = nn.Sequential(
+            nn.Conv2d(in_channels, self.num_classes, kernel_size=1, stride=1),
+            Flatten()
+        )
+        # 1x1 conv for predicting box2box transform deltas
+        self.pred_box = nn.Sequential(
+            nn.Conv2d(in_channels,  4, kernel_size=1, stride=1),
+            Flatten()
+        )
+
+    def forward(self,x):
+        t = self.conv(x)
+        bs = t.size(0)
+        pred_cls = self.pred_cls(t).contiguous().view(bs, self.num_classes)
+        pred_box = self.pred_box(t).contiguous().view(bs, 4)
+
+        return pred_cls,pred_box
+
+
 if __name__=="__main__":
     import sys
     sys.path.append("..")

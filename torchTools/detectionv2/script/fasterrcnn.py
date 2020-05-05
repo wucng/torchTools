@@ -1,7 +1,7 @@
 try:
     from ..tools.engine import train_one_epoch2, evaluate2
     from ..network import net
-    from ..loss import yoloLoss
+    from ..loss import fastrcnnLoss
     from ..datasets import datasets, bboxAug
     from ..visual import opencv
     from ..optm import optimizer
@@ -10,13 +10,14 @@ except:
     import sys
     sys.path.append("..")
     from network import net
-    from loss import yoloLoss
+    from loss import fastrcnnLoss
     from datasets import datasets, bboxAug
     from visual import opencv
     from optm import optimizer
     from config import config
     from tools.engine import train_one_epoch2, evaluate2
 
+from torchvision.ops import roi_align,roi_pool
 from torch import nn
 import torch
 from torch.nn import functional as F
@@ -40,19 +41,19 @@ def collate_fn(batch_data):
 
     return data_list,target_list
 
-class YOLO(nn.Module):
+class FasterRCNN(nn.Module):
     def __init__(self,cfg):
-        super(YOLO,self).__init__()
+        super(FasterRCNN,self).__init__()
 
         self.batch_size = cfg["work"]["train"]["batch_size"]
         self.epochs = cfg["work"]["train"]["epochs"]
         self.print_freq = cfg["work"]["train"]["print_freq"]
         self.isTrain = cfg["work"]["train"]["isTrain"]
         self.classes = cfg["work"]["train"]["classes"]
+        self.resize = cfg["work"]["train"]["resize"]
         num_classes = len(self.classes)
         self.train_method = cfg["work"]["train"]["train_method"]
         typeOfData = cfg["work"]["dataset"]["typeOfData"]
-        version = cfg["work"]["train"]["version"]
 
 
         trainDP = cfg["work"]["dataset"]["trainDataPath"]
@@ -139,13 +140,12 @@ class YOLO(nn.Module):
             self.pred_loader = DataLoader(pred_dataset, batch_size=self.batch_size, shuffle=False,
                                           collate_fn=collate_fn, **kwargs)
 
-        if version=="v1":
-            self.loss_func = yoloLoss.YOLOv1Loss(cfg,self.device)
-        else:
-            self.loss_func = yoloLoss.YOLOv2Loss(cfg, self.device)
-        self.network = net.Network(cfg)
+        self.loss_func = fastrcnnLoss.RPNLoss(cfg, self.device)
+        self.loss_func_rcnn = fastrcnnLoss.RCNNLoss(cfg, self.device)
+        self.network = net.FasterRCNN(cfg)
         if use_FPN:self.network.fpn.apply(net.weights_init_fpn) # backbone 不使用
         self.network.rpn.apply(net.weights_init_rpn)
+        self.network.rcnn.apply(net.weights_init_rpn)
 
         if self.use_cuda:
             self.network.to(self.device)
@@ -200,10 +200,25 @@ class YOLO(nn.Module):
                 data = data.to(self.device)
                 target = [{k: v.to(self.device) for k, v in targ.items()} for targ in target]
 
-            output = self.network(data)
-
+            output,feature = self.network(data)
             loss_dict = self.loss_func(output, target)
+            # """
+            proposals = self.loss_func.proposal(output)
+            # ROi pooling
+            outs = []
+            proposal_list = []
+            fh, fw = feature.shape[-2:]
+            stride_h, stride_w = self.resize[0] / fh, self.resize[1] / fw
+            for i,proposal in enumerate(proposals):
+                boxes = proposal["boxes"] / torch.as_tensor([stride_w, stride_h, stride_w, stride_h],dtype=torch.float32, device=self.device).unsqueeze(0)
+                roi_out = roi_pool(feature[i].unsqueeze(0),proposal["boxes"],[7,7])
+                outs.append(roi_out)
+                proposal_list.append(boxes)
 
+            output = self.network.doRCNN(outs)
+            loss_dict_rcnn = self.loss_func_rcnn(output,proposal_list,target)
+            loss_dict.update(loss_dict_rcnn)
+            # """
             losses = sum(loss for loss in loss_dict.values())
 
             self.optimizer.zero_grad()
@@ -338,25 +353,25 @@ if __name__=="__main__":
     cfg["work"]["dataset"]["predDataPath"] = preddataPath
     cfg["work"]["dataset"]["typeOfData"] = typeOfData
     cfg["work"]["save"]["basePath"] = basePath
-    cfg["network"]["backbone"]["model_name"] = "resnet34"
+    cfg["network"]["backbone"]["model_name"] = "resnet18"
     cfg["network"]["backbone"]["pretrained"] = True
     cfg["work"]["train"]["resize"] = resize
     cfg["work"]["train"]["epochs"] = 50
     cfg["work"]["train"]["classes"] = classes
     cfg["work"]["train"]["useImgaug"] = True
-    cfg["work"]["train"]["version"] = "v1"#"v2"
+    cfg["work"]["train"]["version"] = "v2"
     cfg["work"]["train"]["method"] = 1
-    cfg["network"]["backbone"]["freeze_at"] = "res1"
-    cfg["network"]["RPN"]["num_boxes"] = 1 # 6
+    cfg["network"]["backbone"]["freeze_at"] = "res2"
+    cfg["network"]["RPN"]["num_boxes"] = 6 # 2
     cfg["network"]["RPN"]["num_classes"] = len(classes)
     cfg["work"]["loss"]["alpha"] = 0.2
-    cfg["work"]["loss"]["threshold_conf"] = 0.3
-    cfg["work"]["loss"]["threshold_cls"] = 0.3
-    cfg["work"]["loss"]["conf_thres"] = 0.3
+    cfg["work"]["loss"]["threshold_conf"] = 0.1
+    cfg["work"]["loss"]["threshold_cls"] = 0.1
+    cfg["work"]["loss"]["conf_thres"] = 0.2
 
     # """
     cfg["network"]["FPN"]["use_FPN"] = True
-    cfg["network"]["FPN"]["out_features"] = ["p3","p4","p5"]
+    cfg["network"]["FPN"]["out_features"] = ["p3","p4"]
     cfg["network"]["RPN"]["in_channels"] = 256
     """
     cfg["network"]["backbone"]["out_features"]=["res5"]
@@ -385,8 +400,8 @@ if __name__=="__main__":
                                 enumerate(cfg["network"]["prioriBox"]["aspect_ratios"]) if i in index]
 
     # train_method=1 推荐这种方式训练
-    model = YOLO(cfg)
+    model = FasterRCNN(cfg)
 
-    # model()
-    model.predict()
+    model()
+    # model.predict()
     # model.eval()

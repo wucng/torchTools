@@ -1,7 +1,7 @@
 try:
     from ..tools.engine import train_one_epoch2, evaluate2
     from ..network import net
-    from ..loss import yoloLoss
+    from ..loss import ssdLoss
     from ..datasets import datasets, bboxAug
     from ..visual import opencv
     from ..optm import optimizer
@@ -10,7 +10,7 @@ except:
     import sys
     sys.path.append("..")
     from network import net
-    from loss import yoloLoss
+    from loss import ssdLoss
     from datasets import datasets, bboxAug
     from visual import opencv
     from optm import optimizer
@@ -40,9 +40,9 @@ def collate_fn(batch_data):
 
     return data_list,target_list
 
-class YOLO(nn.Module):
+class SSD(nn.Module):
     def __init__(self,cfg):
-        super(YOLO,self).__init__()
+        super(SSD,self).__init__()
 
         self.batch_size = cfg["work"]["train"]["batch_size"]
         self.epochs = cfg["work"]["train"]["epochs"]
@@ -52,7 +52,6 @@ class YOLO(nn.Module):
         num_classes = len(self.classes)
         self.train_method = cfg["work"]["train"]["train_method"]
         typeOfData = cfg["work"]["dataset"]["typeOfData"]
-        version = cfg["work"]["train"]["version"]
 
 
         trainDP = cfg["work"]["dataset"]["trainDataPath"]
@@ -139,10 +138,7 @@ class YOLO(nn.Module):
             self.pred_loader = DataLoader(pred_dataset, batch_size=self.batch_size, shuffle=False,
                                           collate_fn=collate_fn, **kwargs)
 
-        if version=="v1":
-            self.loss_func = yoloLoss.YOLOv1Loss(cfg,self.device)
-        else:
-            self.loss_func = yoloLoss.YOLOv2Loss(cfg, self.device)
+        self.loss_func = ssdLoss.SSDLoss(cfg, self.device)
         self.network = net.Network(cfg)
         if use_FPN:self.network.fpn.apply(net.weights_init_fpn) # backbone 不使用
         self.network.rpn.apply(net.weights_init_rpn)
@@ -344,14 +340,14 @@ if __name__=="__main__":
     cfg["work"]["train"]["epochs"] = 50
     cfg["work"]["train"]["classes"] = classes
     cfg["work"]["train"]["useImgaug"] = True
-    cfg["work"]["train"]["version"] = "v1"#"v2"
+    cfg["work"]["train"]["version"] = "v2"
     cfg["work"]["train"]["method"] = 1
-    cfg["network"]["backbone"]["freeze_at"] = "res1"
-    cfg["network"]["RPN"]["num_boxes"] = 1 # 6
+    cfg["network"]["backbone"]["freeze_at"] = "res2"
+    cfg["network"]["RPN"]["num_boxes"] = 6 # 2
     cfg["network"]["RPN"]["num_classes"] = len(classes)
     cfg["work"]["loss"]["alpha"] = 0.2
-    cfg["work"]["loss"]["threshold_conf"] = 0.3
-    cfg["work"]["loss"]["threshold_cls"] = 0.3
+    cfg["work"]["loss"]["threshold_conf"] = 0.2
+    cfg["work"]["loss"]["threshold_cls"] = 0.2
     cfg["work"]["loss"]["conf_thres"] = 0.3
 
     # """
@@ -385,7 +381,7 @@ if __name__=="__main__":
                                 enumerate(cfg["network"]["prioriBox"]["aspect_ratios"]) if i in index]
 
     # train_method=1 推荐这种方式训练
-    model = YOLO(cfg)
+    model = SSD(cfg)
 
     # model()
     model.predict()

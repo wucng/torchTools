@@ -34,6 +34,36 @@ class Network(nn.Module):
         out = self.rpn(features)
         return out
 
+
+class FasterRCNN(nn.Module):
+    def __init__(self, cfg):
+        super(FasterRCNN, self).__init__()
+        self.backbone = BackBoneNet(cfg)
+        self.use_FPN = cfg["network"]["FPN"]["use_FPN"]
+        fpn_name = cfg["network"]["FPN"]["name"]
+
+        self.align_features = cfg["network"]["RCNN"]["align_features"]
+
+        if self.use_FPN:
+            self.fpn = fpn_dict[fpn_name](cfg,self.backbone.backbone_size)
+
+        self.rpn = RPN(cfg)
+        self.rcnn = RCNN(cfg)
+
+    def forward(self,x):
+        features = self.backbone(x)
+        if self.use_FPN:
+            features = self.fpn(features)
+        out = self.rpn(features)
+        return out,features[self.align_features]
+
+    def doRCNN(self,features):
+        out=[]
+        for feature in features:
+            out.append(self.rcnn(feature))
+        return out
+
+
 if __name__ == "__main__":
     import sys
     sys.path.append("..")

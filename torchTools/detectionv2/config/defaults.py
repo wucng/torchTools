@@ -22,8 +22,22 @@ _cfg = {
         "RPN":{
             "in_channels":256,
             "num_boxes":2,
-            "num_classes":1 # 不包括背景
+            "num_classes":1, # 不包括背景
+
         },
+        "proposal":{
+            "threshold_cls":0.05,
+            "nms_thres":0.7,
+            "num_anchor":1000
+        },
+        "RCNN":{
+            "in_channels":256,
+            # "num_boxes":1,
+            "num_classes":1, # 不包括背景
+            "align_features":"p3",
+            "thred_iou":0.7
+        },
+
         # ssd对应得先验框
         "prioriBox":{
             "min_dim":300,
@@ -65,7 +79,7 @@ _cfg = {
         },
         "optimizer":{
             "clip_gradients":True,
-            "base_lr":2.5e-4,
+            "base_lr":2.5e-4, # 2.5e-4
             "weight_decay":1e-4,
             "momentum":0.9,
             "clip_type":"value", # norm

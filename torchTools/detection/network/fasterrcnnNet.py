@@ -69,8 +69,8 @@ def FasterRCNN1(num_classes=2, model_name="resnet101", pretrained=False,usize = 
         for name, parameter in backbone.named_parameters():
             if 'layer2' not in name and 'layer3' not in name and 'layer4' not in name:
                 parameter.requires_grad_(False)
-        # return_layers = {'layer1': 0, 'layer2': 1, 'layer3': 2, 'layer4': 3}
-        return_layers = {'layer1': '0', 'layer2': '1', 'layer3': '2', 'layer4': '3'}
+        return_layers = {'layer1': 0, 'layer2': 1, 'layer3': 2, 'layer4': 3}
+        # return_layers = {'layer1': '0', 'layer2': '1', 'layer3': '2', 'layer4': '3'}
         in_channels_list = [
             backbone_size // 8,  # 64 layer1 输出特征维度
             backbone_size // 4,  # 128 layer2 输出特征维度
@@ -88,7 +88,7 @@ def FasterRCNN1(num_classes=2, model_name="resnet101", pretrained=False,usize = 
         anchor_generator = AnchorGenerator(sizes=((32, 64, 128, 256, 512),),
                                            aspect_ratios=((0.5, 1.0, 2.0),))
 
-        roi_pooler = torchvision.ops.MultiScaleRoIAlign(featmap_names=[str(0)],
+        roi_pooler = torchvision.ops.MultiScaleRoIAlign(featmap_names=[0],
                                                         output_size=7,
                                                         sampling_ratio=2)
 

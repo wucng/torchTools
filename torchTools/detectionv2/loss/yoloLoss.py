@@ -359,42 +359,7 @@ class YOLOv2Loss(nn.Module):
 
         self.priorBoxWH = self.get_prior_box_wh()
 
-    def get_prior_box(self):
-        priors = []
-        h, w = self.resize
-        for idx,stride in enumerate(self.strides):
-            fh, fw = h//stride,w//stride
-            for i in range(fh):
-                for j in range(fw):
-                    # unit center x,y
-                    cx = (j + 0.5) / fw
-                    cy = (i + 0.5) / fh
-
-                    # small sized square box
-                    size_min = self.min_sizes[idx]
-                    size_max = self.max_sizes[idx]
-                    size = size_min
-                    bh, bw = 1.0 * size / h, 1.0 * size / w
-                    priors.append([cx, cy, bw, bh])
-
-                    # big sized square box
-                    size = sqrt(size_min * size_max)
-                    bh, bw = 1.0 * size / h, 1.0 * size / w
-                    priors.append([cx, cy, bw, bh])
-
-                    # change h/w ratio of the small sized box
-                    size = size_min
-                    bh, bw = 1.0 * size / h, 1.0 * size / w
-                    for ratio in self.aspect_ratios[idx]:
-                        ratio = sqrt(ratio)
-                        priors.append([cx, cy, bw * ratio, 1.0 * bh / ratio])
-                        priors.append([cx, cy, 1.0 * bw / ratio, bh * ratio])
-
-        priors = torch.tensor(priors, device=self.device)
-        if self.clip:
-            priors.clamp_(max=1, min=0)
-        return priors
-
+    
     def get_prior_box_wh(self):
         priors = []
         h, w = self.resize

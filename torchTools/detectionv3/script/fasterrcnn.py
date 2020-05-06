@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import time
 from torch.utils.tensorboard import SummaryWriter
 try:
-    from ..tools.engine import train_one_epoch, evaluate
+    from ..tools.engine import train_one_epoch, evaluate,train_one_epoch2
     from ..tools import utils,transforms as T
     # from ..tools.nms_pytorch import nms2 as nms
     from ..network.fasterrcnn import fasterrcnn
@@ -22,7 +22,7 @@ try:
 except:
     import sys
     sys.path.append("..")
-    from tools.engine import train_one_epoch, evaluate
+    from tools.engine import train_one_epoch, evaluate,train_one_epoch2
     from tools import utils, transforms as T
     # from tools.nms_pytorch import nms2 as nms
     from network.fasterrcnn import fasterrcnn
@@ -43,7 +43,7 @@ def get_transform(train,advanced=False):
 
             # ---------两者取其一--------------------
             bboxAug.RandomHorizontalFlip(),
-            bboxAug.RandomTranslate(), # 如果有mask也需相应修改
+            # bboxAug.RandomTranslate(), # 如果有mask也需相应修改
             # bboxAug.RandomRotate(3),
             bboxAug.RandomBrightness(),
             bboxAug.RandomSaturation(),
@@ -74,7 +74,7 @@ def get_transform2(train):
 
 class Fasterrcnn(nn.Module):
     def __init__(self,trainDP=None,classes=[],model_name="resnet101",
-                 pretrained=False,out_channels = 256,use_FPN=False,
+                 pretrained=False,out_channels = 256,use_FPN=False,use_mask=False,
                  lr=5e-4,num_epochs = 10,filter_labels=[],
                  print_freq=20,rpn_nms_thresh=0.7,
                  box_score_thresh=0.05,
@@ -128,13 +128,20 @@ class Fasterrcnn(nn.Module):
             dataset_test, batch_size=batch_size//2 if batch_size//2 else 1, shuffle=False,
             collate_fn=utils.collate_fn,**kwargs)
 
-
-        self.network = fasterrcnn.FasterRCNN(model_name=model_name,pretrained=pretrained,
-                                             out_channels=out_channels,useFPN=use_FPN,
-                                             num_classes=num_classes,rpn_nms_thresh=rpn_nms_thresh,
-                                             box_score_thresh=box_score_thresh,
-                                             box_nms_thresh=box_nms_thresh
-                                             )
+        if use_mask:
+            self.network = fasterrcnn.MaskRCNN(model_name=model_name, pretrained=pretrained,
+                                                 out_channels=out_channels, useFPN=use_FPN,
+                                                 num_classes=num_classes, rpn_nms_thresh=rpn_nms_thresh,
+                                                 box_score_thresh=box_score_thresh,
+                                                 box_nms_thresh=box_nms_thresh
+                                                 )
+        else:
+            self.network = fasterrcnn.FasterRCNN(model_name=model_name,pretrained=pretrained,
+                                                 out_channels=out_channels,useFPN=use_FPN,
+                                                 num_classes=num_classes,rpn_nms_thresh=rpn_nms_thresh,
+                                                 box_score_thresh=box_score_thresh,
+                                                 box_nms_thresh=box_nms_thresh
+                                                 )
 
         if self.use_cuda:
             # move model to the right device
@@ -154,14 +161,14 @@ class Fasterrcnn(nn.Module):
 
         # and a learning rate scheduler which decreases the learning rate by
         # 10x every 3 epochs
-        # self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer,step_size=3,gamma=0.1)
-        self.lr_scheduler = optimizer.build_lr_scheduler(self.optimizer)
+        self.lr_scheduler = torch.optim.lr_scheduler.StepLR(self.optimizer,step_size=3,gamma=0.1)
         """
         self.optimizer = optimizer.build_optimizer(self.network,lr,clip_gradients=True)
         self.lr_scheduler = optimizer.build_lr_scheduler(self.optimizer)
+        # """
 
         self.writer = SummaryWriter(os.path.join(basePath, summaryPath))
-        # """
+
     def forward(self):
         for epoch in range(self.num_epochs):
             self.train(epoch)
@@ -203,7 +210,9 @@ class Fasterrcnn(nn.Module):
 
     def train(self,epoch):
             # train for one epoch, printing every 10 iterations
-            train_one_epoch(self.network, self.optimizer, self.train_loader, self.device, epoch, self.print_freq)
+            # train_one_epoch(self.network, self.optimizer, self.train_loader, self.device, epoch, self.print_freq)
+            train_one_epoch2(self.network, self.optimizer, self.train_loader, self.device, epoch, self.print_freq,
+                             self.writer,self.batch_size)
 
     def eval(self):
         # evaluate on the test dataset
@@ -245,10 +254,14 @@ class Fasterrcnn(nn.Module):
                 # cv2.imwrite(newPath, image)
 
     def draw_rect(self,image, pred):
-        """segms=False 不画mask"""
         labels = pred["labels"]
         bboxs = pred["boxes"]
         scores = pred["scores"]
+        hasMask = "masks" in pred
+        if hasMask:
+            masks = pred["masks"]
+            mask_color_id = 0
+            color_list = colormap.colormap()
 
         for idx,(label, bbox, score) in enumerate(zip(labels, bboxs, scores)):
             label = label.cpu().numpy()
@@ -256,21 +269,28 @@ class Fasterrcnn(nn.Module):
             score = score.cpu().numpy()
             class_str = "%s:%.3f" % (self.classes[int(label)-1], score)  # 跳过背景
             pos = list(map(int, bbox))
-            image = opencv.vis_rect(image, pos, class_str, 0.5, int(label),useMask=True)
+            image = opencv.vis_rect(image, pos, class_str, 0.5, int(label),useMask=False if hasMask else True)
+            if hasMask:
+                mask = masks[idx].cpu().numpy()
+                mask = np.clip(np.squeeze(mask, 0) * 255., 0, 255).astype(np.uint8)
+                mask_color_id += 1
+                color_mask = color_list[mask_color_id % len(color_list), 0:3]
+                image = opencv.vis_mask(image, mask, color_mask, 0.3, True)
 
         return image
 
 if __name__ == "__main__":
     classes = ["person"]
-    testdataPath = r"D:\practice\datas\PennFudanPed\PNGImages"
-    traindataPath = r"D:\practice\datas\PennFudanPed"
+    testdataPath = r"/media/wucong/225A6D42D4FA828F1/datas/PennFudanPed/PNGImages"
+    traindataPath = r"/media/wucong/225A6D42D4FA828F1/datas/PennFudanPed"
     # testdataPath = "../../datas/PennFudanPed/PNGImages"
     # traindataPath = "../../datas/PennFudanPed"
     basePath = "./models"
     typeOfData = "PennFudanDataset"
 
-    model = Fasterrcnn(traindataPath, classes, "resnet18", pretrained=True,
-                       out_channels=256,use_FPN=True,lr=5e-3,num_epochs=10,
+    model = Fasterrcnn(traindataPath, classes, "resnet34", pretrained=True,
+                       out_channels=256,use_FPN=True,use_mask=True,lr=5e-4,
+                       num_epochs=50, # lr=5e-4,out_channels=256,use_FPN=True
                        print_freq=20,box_score_thresh=0.3,box_nms_thresh=0.4,
                        batch_size=2,basePath=basePath,typeOfData=typeOfData)
 

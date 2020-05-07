@@ -70,7 +70,7 @@ _cfg = {
             "advanced":False,
             "useImgaug":True,
             # "lr":5e-4,
-            "train_method":0,
+            "train_method":1,
             "method":0,
 
             "classes":[],

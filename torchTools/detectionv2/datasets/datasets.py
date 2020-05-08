@@ -373,6 +373,7 @@ class PennFudanDataset(Dataset):
         target["image_id"] = image_id
         target["area"] = area
         target["iscrowd"] = iscrowd
+        target["path"] = img_path
 
         if self.transforms is not None:
             img, target = self.transforms(img, target)

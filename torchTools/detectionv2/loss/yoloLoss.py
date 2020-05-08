@@ -17,7 +17,7 @@ import torch
 from torch.nn import functional as F
 import random
 import numpy as np
-from .focalLoss import smooth_l1_loss_jit,giou_loss_jit,\
+from .focalLoss import smooth_l1_loss_jit,giou_loss_jit,ciou_loss_jit,diou_loss_jit,\
     sigmoid_focal_loss_jit,softmax_focal_loss_jit
 # import math
 from math import sqrt
@@ -62,7 +62,7 @@ class YOLOv1Loss(nn.Module):
         losses = {
             "loss_conf": 0,
             "loss_no_conf": 0,
-            "loss_box": 0,
+            # "loss_box": 0,
             "loss_clf": 0,
             "loss_no_clf": 0,
             "loss_iou": 0
@@ -87,22 +87,27 @@ class YOLOv1Loss(nn.Module):
                                            self.alpha, self.gamma, reduction="sum")
         loss_no_conf = sigmoid_focal_loss_jit(no_conf, torch.zeros_like(no_conf).detach(),
                                               self.alpha, self.gamma, reduction="sum")
-        loss_box = smooth_l1_loss_jit(torch.sigmoid(box), tbox.detach(), 2e-5, reduction="sum")
+        # loss_box = smooth_l1_loss_jit(torch.sigmoid(box), tbox.detach(), 2e-5, reduction="sum")
+        # loss_box_xy = F.smooth_l1_loss(torch.sigmoid(box[...,:2]),tbox[...,:2], reduction="sum")
+        # loss_box_wh = F.smooth_l1_loss(torch.sigmoid(box[...,2:]).sqrt(),tbox[...,2:].sqrt(), reduction="sum")
+        # loss_box = loss_box_xy+loss_box_wh
         loss_clf = sigmoid_focal_loss_jit(cls, tcls.detach(),
                                           self.alpha, self.gamma, reduction="sum")
         loss_no_clf = F.mse_loss(torch.sigmoid(no_cls), torch.zeros_like(no_cls).detach(),
                                  reduction="sum")
 
         # iou loss
-        loss_iou = giou_loss_jit(xywh2x1y1x2y2(torch.sigmoid(box)),xywh2x1y1x2y2(tbox).detach(), reduction="sum")
+        # loss_iou = giou_loss_jit(xywh2x1y1x2y2(torch.sigmoid(box)),xywh2x1y1x2y2(tbox).detach(), reduction="sum")
+        loss_iou = ciou_loss_jit(xywh2x1y1x2y2(torch.sigmoid(box)),xywh2x1y1x2y2(tbox).detach(), reduction="sum")
 
-
-        losses["loss_conf"] += loss_conf
-        losses["loss_no_conf"] += loss_no_conf * 0.05  # 0.05
-        losses["loss_box"] += loss_box  # 50
-        losses["loss_clf"] += loss_clf
-        losses["loss_no_clf"] += loss_no_clf * 0.05
-        losses["loss_iou"] += loss_iou * 10.
+        lambdanoobj = 0.5
+        lambdaobj = 5.0
+        losses["loss_conf"] = loss_conf*lambdaobj
+        losses["loss_no_conf"] = loss_no_conf * lambdanoobj
+        # losses["loss_box"] = loss_box*lambdaobj
+        losses["loss_clf"] = loss_clf*lambdaobj
+        losses["loss_no_clf"] = loss_no_clf * lambdanoobj
+        losses["loss_iou"] = loss_iou*lambdaobj
 
         return losses
 
@@ -219,13 +224,13 @@ class YOLOv1Loss(nn.Module):
                 h_f,w_f = h//strides_h, w//strides_w
                 boxes = cboxes[index:index+h_f*w_f,...]
                 # to 格网(x,y) 格式
-                temp = torch.arange(0, len(boxes))
+                temp = torch.arange(0, len(boxes),device=self.device)
                 grid_y = temp // w_f
                 grid_x = temp - grid_y * w_f
 
                 for j in range(self.num_anchors):
-                    x0 = boxes[:,j, 0] * w + (grid_x * strides_w).float().to(self.device)
-                    y0 = boxes[:,j, 1] * h + (grid_y * strides_h).float().to(self.device)
+                    x0 = boxes[:,j, 0] * w + (grid_x * strides_w).float()
+                    y0 = boxes[:,j, 1] * h + (grid_y * strides_h).float()
                     w_b = boxes[:,j, 2] * w
                     h_b = boxes[:,j, 3] * h
 

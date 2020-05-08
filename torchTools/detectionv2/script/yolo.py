@@ -133,6 +133,9 @@ class YOLO(nn.Module):
 
                 self.pred_loader = DataLoader(pred_dataset, batch_size=self.batch_size, shuffle=False,
                                               collate_fn=collate_fn, **kwargs)
+            else:
+                self.pred_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False,
+                                              collate_fn=collate_fn, **kwargs)
         else:
             pred_dataset = datasets.ValidDataset(predDP,transforms=test_transforms)
 
@@ -198,7 +201,7 @@ class YOLO(nn.Module):
             data = torch.stack(data, 0)  # 不使用多尺度，因此会resize到同一尺度，可以直接按batch计算，加快速度
             if self.use_cuda:
                 data = data.to(self.device)
-                target = [{k: v.to(self.device) for k, v in targ.items()} for targ in target]
+                target = [{k: v.to(self.device) for k, v in targ.items() if k not in ["path"]} for targ in target]
 
             output = self.network(data)
 
@@ -270,7 +273,7 @@ class YOLO(nn.Module):
                 if self.use_cuda:
                     data = data.to(self.device)
                     # data = [d.to(self.device) for d in data]
-                    new_target = [{k: v.to(self.device) for k, v in targ.items() if k!="path"} for targ in target]
+                    new_target = [{k: v.to(self.device) for k, v in targ.items() if k not in ["path","boxes","labels"]} for targ in target]
                 else:
                     new_target = target
 
@@ -319,9 +322,9 @@ class YOLO(nn.Module):
 if __name__=="__main__":
     # """
     classes = ["person"]
-    preddataPath = r"D:\practice\datas\PennFudanPed\PNGImages"
+    preddataPath = None
     testdataPath = None
-    traindataPath = r"D:\practice\datas\PennFudanPed"
+    traindataPath = r"/media/wucong/225A6D42D4FA828F1/datas/PennFudanPed"
     typeOfData = "PennFudanDataset"
     """
     classes = ["bicycle", "bus", "car", "motorbike", "person"]
@@ -346,15 +349,17 @@ if __name__=="__main__":
     cfg["work"]["train"]["useImgaug"] = True
     cfg["work"]["train"]["version"] = "v1"#"v2"
     cfg["work"]["train"]["method"] = 1
-    cfg["network"]["backbone"]["freeze_at"] = "res1"
+    cfg["network"]["backbone"]["freeze_at"] = "res0"
     cfg["network"]["RPN"]["num_boxes"] = 1 # 6
     cfg["network"]["RPN"]["num_classes"] = len(classes)
     cfg["work"]["loss"]["alpha"] = 0.2
-    cfg["work"]["loss"]["threshold_conf"] = 0.3
+    cfg["work"]["loss"]["threshold_conf"] = 0.2
     cfg["work"]["loss"]["threshold_cls"] = 0.3
     cfg["work"]["loss"]["conf_thres"] = 0.3
 
-    # """
+    cfg["work"]["optimizer"]["base_lr"] = 5e-4
+
+    """
     cfg["network"]["FPN"]["use_FPN"] = True
     cfg["network"]["FPN"]["out_features"] = ["p3","p4","p5"]
     cfg["network"]["RPN"]["in_channels"] = 256

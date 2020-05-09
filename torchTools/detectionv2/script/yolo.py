@@ -327,7 +327,12 @@ if __name__=="__main__":
     traindataPath = r"/media/wucong/225A6D42D4FA828F1/datas/PennFudanPed"
     typeOfData = "PennFudanDataset"
     """
-    classes = ["bicycle", "bus", "car", "motorbike", "person"]
+    # classes = ["bicycle", "bus", "car", "motorbike", "person"]
+    classes=["aeroplane","bicycle","bird","boat",
+    "bottle","bus","car","cat","chair","cow",
+    "diningtable","dog","horse","motorbike",
+    "person","pottedplant","sheep","sofa",
+    "train","tvmonitor"]
     testdataPath = "/home/wucong/practise/datas/valid/PNGImages/"
     traindataPath = "/home/wucong/practise/datas/VOCdevkit/"
     typeOfData = "PascalVOCDataset"

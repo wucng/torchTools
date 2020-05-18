@@ -55,8 +55,9 @@ def test_datasets():
                # bboxAug.RandomHue(),
                # bboxAug.RandomRotate(angle=5),
                # bboxAug.RandomTranslate(),
-               bboxAug.Augment(False),
-               bboxAug.Pad(), bboxAug.Resize((416,416), False),
+               # bboxAug.Augment(False),
+               # bboxAug.Pad(), bboxAug.Resize((416,416), False),
+               bboxAug.ResizeMinMax(800,1333),
                bboxAug.ToTensor(), # PIL --> tensor
                # bboxAug.Normalize() # tensor --> tensor
            ]),classes=classes)

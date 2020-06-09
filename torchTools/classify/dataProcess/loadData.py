@@ -5,7 +5,8 @@ import random
 from glob import glob
 import PIL.Image
 import os
-
+import torch
+import cv2
 
 def get_classnames(base_dir):
     classnames = sorted(os.listdir(os.path.join(base_dir)))
@@ -154,15 +155,115 @@ class Data_train_valid2(Dataset):
     def __len__(self):
         return len(self.datas)
 
-    def __getitem__(self,idx):
+    def _load(self):
         path = self.datas[idx]
         img = PIL.Image.open(path).convert("RGB")
+        # target
+        target = self.classnames.index(os.path.basename(os.path.dirname(path)))
+        return img,target
 
+    def __getitem__(self,idx):
+        img, target = self._load()
         if self.transform is not None:
             img = self.transform(img)
 
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        return img, target
+
+
+# 2.ricap, 3.mixup 数据增强
+class Data_train_valid3(Dataset):
+    def __init__(self,datas,classnames,transform=None,target_transform=None):
+        super(Data_train_valid3, self).__init__()
+        self.datas = datas
+        self.classnames = classnames
+        self.transform = transform
+        self.target_transform = target_transform
+        self.n_classes = len(self.classnames)
+        self.alpha = 0.8
+        self.alpha_ricap = 0.7
+        self.alpha_general = 0.03
+
+    def __len__(self):
+        return len(self.datas)
+
+    def _load(self,idx):
+        path = self.datas[idx]
+        img = np.asarray(PIL.Image.open(path).convert("RGB"),np.uint8)
         # target
         target = self.classnames.index(os.path.basename(os.path.dirname(path)))
+        # to onehot
+        target = np.eye(self.n_classes,self.n_classes)[target]
+
+        return img,target
+
+    def _mixup(self,idx):
+        index = torch.randperm(self.__len__()).tolist()
+        if idx + 1 >= self.__len__():
+            idx = 0
+        idx2 = index[idx + 1]
+        img, target = self._load(idx)
+        img2, target2 = self._load(idx2)
+
+        # mixup
+        img = np.clip(cv2.addWeighted(img,self.alpha,img2,1-self.alpha,gamma=0.0),0,255).astype(np.uint8)
+        target = target*self.alpha+target2*(1-self.alpha)
+
+        return img,target
+
+
+    def _ricap(self,idx):
+        # 类似Mosaic数据增强
+        index = torch.randperm(self.__len__()).tolist()
+        if idx + 3 >= self.__len__():
+            idx = 0
+        idx2 = index[idx + 1]
+        idx3 = index[idx + 2]
+        idx4 = index[idx + 3]
+
+        img, target = self._load(idx)
+        img2, target2 = self._load(idx2)
+        img3, target3 = self._load(idx3)
+        img4, target4 = self._load(idx4)
+
+        h1, w1, _ = img.shape
+        h2, w2, _ = img2.shape
+        h3, w3, _ = img3.shape
+        h4, w4, _ = img4.shape
+
+        h = max((h1, h2, h3, h4))
+        w = max((w1, w2, w3, h4))
+
+        th=int(h*self.alpha_ricap)
+        tw=int(w*self.alpha_ricap)
+
+        temp_img = np.zeros((h,w,3),np.uint8)
+        temp_img[:th,:tw]=cv2.resize(img,(tw,th),interpolation=cv2.INTER_BITS)
+        temp_img[:th,tw:]=cv2.resize(img2,(w-tw,th),interpolation=cv2.INTER_BITS)
+        temp_img[th:,:tw]=cv2.resize(img3,(tw,h-th),interpolation=cv2.INTER_BITS)
+        temp_img[th:,tw:]=cv2.resize(img4,(w-tw,h-th),interpolation=cv2.INTER_BITS)
+
+        target = (target*(tw*th)+target2*(w-tw)*th+target3*tw*(h-th)+target4*(w-tw)*(h-th))/(h*w)
+
+        return temp_img,target
+
+
+    def __getitem__(self,idx):
+        state = np.random.choice(["general", "ricap", "mixup"], 1)[0]
+        if state == "general":
+            img, target = self._load(idx)
+            # smooth label
+            target = target * (1 - self.alpha_general) + self.alpha_general / self.n_classes * np.ones_like(target)
+        elif state == "ricap":
+            img, target = self._ricap(idx)
+        else:
+            img, target = self._mixup(idx)
+
+        img = PIL.Image.fromarray(img)
+        if self.transform is not None:
+            img = self.transform(img)
 
         if self.target_transform is not None:
             target = self.target_transform(target)

@@ -1,5 +1,7 @@
 # -*- coding:utf-8 -*-
-
+"""
+https://zhuanlan.zhihu.com/p/137073821  mixup,Mosaic
+"""
 from __future__ import print_function
 import xml.etree.ElementTree as ET
 import skimage.io as io
@@ -160,12 +162,49 @@ class PascalVOCDataset(Dataset):
 
         return img,boxes,labels
 
+    def mixup(self,idx):
+        index = torch.randperm(self.__len__()).tolist()
+        if idx + 1 >= self.__len__():
+            idx = 0
+
+        idx2 = index[idx + 1]
+        img, boxes, labels = self.load(idx)
+        img2, boxes2, labels2 = self.load(idx2)
+
+        h1, w1, _ = img.shape
+        h2, w2, _ = img2.shape
+
+        h = max((h1, h2))
+        w = max((w1, w2))
+
+        temp_img1 = np.zeros((h, w, 3), np.uint8)
+        temp_img2 = np.zeros((h, w, 3), np.uint8)
+        temp_img1[:h1,:w1] = img
+        temp_img2[:h2,:w2] = img2
+
+        temp_img = np.clip(cv2.addWeighted(temp_img1,0.5,temp_img2,0.5,0.0),0,255).astype(np.uint8)
+
+        temp_boxes = []
+        temp_labels = []
+        temp_boxes.extend(boxes)
+        temp_boxes.extend(boxes2)
+        temp_labels.extend(labels)
+        temp_labels.extend(labels2)
+
+        img = temp_img
+        boxes = torch.stack(temp_boxes, 0).float()
+        labels = torch.as_tensor(temp_labels, dtype=torch.long)
+
+        return img, boxes, labels
 
     def __getitem__(self, idx):
-        if random.random()<0.5: # 50%的几率
+        state = np.random.choice(["general", "ricap", "mixup"], 1)[0]
+        if state == "general":
+            img, boxes, labels = self.load(idx)
+        elif state == "ricap":
             img, boxes, labels = self.mosaic(idx)
         else:
-            img, boxes, labels = self.load(idx)
+            img, boxes, labels = self.mixup(idx)
 
         img = Image.fromarray(img)
         target = {}
@@ -492,11 +531,55 @@ class PennFudanDataset(Dataset):
 
         return img,masks,boxes,labels
 
+    def mixup(self,idx):
+        index = torch.randperm(self.__len__()).tolist()
+        if idx + 1 >= self.__len__():
+            idx = 0
+
+        idx2 = index[idx + 1]
+        img, mask, boxes, labels = self.load(idx)
+        img2, mask2, boxes2, labels2 = self.load(idx2)
+
+        h1, w1, _ = img.shape
+        h2, w2, _ = img2.shape
+
+        h = max((h1, h2))
+        w = max((w1, w2))
+
+        temp_img1 = np.zeros((h, w, 3), np.uint8)
+        temp_img2 = np.zeros((h, w, 3), np.uint8)
+        temp_img1[:h1,:w1] = img
+        temp_img2[:h2,:w2] = img2
+
+        temp_mask1 = np.zeros((h, w), np.uint8)
+        temp_mask2 = np.zeros((h, w), np.uint8)
+        temp_mask1[:h1, :w1] = mask
+        temp_mask2[:h2, :w2] = mask2
+
+        temp_mask = np.clip(cv2.addWeighted(temp_mask1, 0.5, temp_mask2, 0.5, 0.0), 0, 255).astype(np.uint8)
+        temp_img = np.clip(cv2.addWeighted(temp_img1,0.5,temp_img2,0.5,0.0),0,255).astype(np.uint8)
+
+        temp_boxes = []
+        temp_labels = []
+        temp_boxes.extend(boxes)
+        temp_boxes.extend(boxes2)
+        temp_labels.extend(labels)
+        temp_labels.extend(labels2)
+
+        img = temp_img
+        boxes = torch.stack(temp_boxes, 0).float()
+        labels = torch.as_tensor(temp_labels, dtype=torch.long)
+
+        return img,temp_mask,boxes, labels
+
     def __getitem__(self, idx):
-        if random.random()<0.5: # 50%的几率
+        state = np.random.choice(["general", "ricap", "mixup"], 1)[0]
+        if state == "general":
+            img, masks,boxes, labels = self.load(idx)
+        elif state == "ricap":
             img, masks,boxes, labels = self.mosaic(idx)
         else:
-            img, masks,boxes, labels = self.load(idx)
+            img, masks,boxes, labels = self.mixup(idx)
 
         img = Image.fromarray(img)
 

@@ -24,45 +24,45 @@ def collate_fn(batch_data):
 
 
 def test_datasets():
-    root = r"/media/wucong/225A6D42D4FA828F1/datas/PennFudanPed"
-    classes = ["person"]
-    # root = "/media/wucong/225A6D42D4FA828F1/datas/voc/VOCdevkit/"
-    # classes = ["aeroplane", "bicycle", "bird", "boat",
-    #            "bottle", "bus", "car", "cat", "chair", "cow",
-    #            "diningtable", "dog", "horse", "motorbike",
-    #            "person", "pottedplant", "sheep", "sofa",
-    #            "train", "tvmonitor"]
+    # root = r"/media/wucong/225A6D42D4FA828F1/datas/PennFudanPed"
+    # classes = ["person"]
+    root = "/media/wucong/225A6D42D4FA828F1/datas/voc/VOCdevkit/"
+    classes = ["aeroplane", "bicycle", "bird", "boat",
+               "bottle", "bus", "car", "cat", "chair", "cow",
+               "diningtable", "dog", "horse", "motorbike",
+               "person", "pottedplant", "sheep", "sofa",
+               "train", "tvmonitor"]
     seed = 100
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     torch.manual_seed(seed)
     kwargs = {'num_workers': 5, 'pin_memory': True} if use_cuda else {}
 
-    # PascalVOCDataset = datasets.datasets.PascalVOCDataset
-    PennFudanDataset = datasets.datasets.PennFudanDataset
+    PascalVOCDataset = datasets.datasets.PascalVOCDataset
+    # PennFudanDataset = datasets.datasets.PennFudanDataset
     vis_rect = visual.opencv.vis_rect
 
     bboxAug = datasets.bboxAug
-    dataset = PennFudanDataset(root, transforms=bboxAug.Compose([
-        bboxAug.ToTensor()
-    ]))
+    # dataset = PennFudanDataset(root, transforms=bboxAug.Compose([
+    #     bboxAug.ToTensor()
+    # ]))
 
-    # dataset = PascalVOCDataset(root,  \
-    #        transforms=bboxAug.Compose([
-    #            # bboxAug.RandomChoice(),
-    #            # bboxAug.RandomHorizontalFlip(),
-    #            # bboxAug.RandomBrightness(),
-    #            # bboxAug.RandomBlur(),
-    #            # bboxAug.RandomSaturation(),
-    #            # bboxAug.RandomHue(),
-    #            # bboxAug.RandomRotate(angle=5),
-    #            # bboxAug.RandomTranslate(),
-    #            # bboxAug.Augment(False),
-    #            # bboxAug.Pad(), bboxAug.Resize((416,416), False),
-    #            # bboxAug.ResizeMinMax(800,1333),
-    #            bboxAug.ToTensor(), # PIL --> tensor
-    #            # bboxAug.Normalize() # tensor --> tensor
-    #        ]),classes=classes)
+    dataset = PascalVOCDataset(root,  \
+           transforms=bboxAug.Compose([
+               # bboxAug.RandomChoice(),
+               # bboxAug.RandomHorizontalFlip(),
+               # bboxAug.RandomBrightness(),
+               # bboxAug.RandomBlur(),
+               # bboxAug.RandomSaturation(),
+               # bboxAug.RandomHue(),
+               # bboxAug.RandomRotate(angle=5),
+               # bboxAug.RandomTranslate(),
+               # bboxAug.Augment(False),
+               # bboxAug.Pad(), bboxAug.Resize((416,416), False),
+               # bboxAug.ResizeMinMax(800,1333),
+               bboxAug.ToTensor(), # PIL --> tensor
+               # bboxAug.Normalize() # tensor --> tensor
+           ]),classes=classes)
 
     data_loader = DataLoader(dataset, batch_size=2, shuffle=False,collate_fn=collate_fn, **kwargs)
 
